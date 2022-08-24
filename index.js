@@ -10,7 +10,7 @@ dotenv.config();
 
 mongoose.connect(process.env.DB_CONNECT, 
     () => console.log("CONNECTED TO DB"));
-    
+
 // Middleware
 
 app.use(function(req, res, next) {
