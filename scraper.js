@@ -190,16 +190,26 @@ async function getAllEvents() {
     mongoose.connect(process.env.DB_CONNECT, 
     () => console.log("CONNECTED TO DB"));
 
-    const browser = await puppeteer.launch({
+    // const browser = await puppeteer.launch({
+    //     headless: true,
+    //     args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    //   });
+
+        const browser = await puppeteer.launch({
         headless: true,
-        args: ["--no-sandbox", "--disable-setuid-sandbox"],
+        args: ["--no-sandbox"],
       });
+    console.log("GETTING PUSTERVIK!");
     const pEvents = await getPustervikEvents(browser);
-    
+    console.log("FORMATTING PUSTERVIK!");
     const pustervikEvents = formatPustervikEvents(pEvents)
+    console.log("GETTING OCEANEN!");
     const oceanenEvents = await getOceanenEvents(browser);
 
+    console.log("GETTING MUSIKENS HUS!");
+
     const musikensHusEvents = await getMusikensHusEvents(browser);
+    console.log("GETTING Nefertiti!");
     const nefertitiEvents = await getNefertitiEvents(browser);
 
 
@@ -210,6 +220,8 @@ async function getAllEvents() {
         date: new Date(),
         events: allEvents
     });
+
+    console.log("INSERTING!");
 
     try {
         const savedEvents = await events.save();
