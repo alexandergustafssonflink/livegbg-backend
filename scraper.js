@@ -249,7 +249,7 @@ async function getAllEvents() {
     //   }
 }
 
-const job = schedule.scheduleJob('*/3 * * * *', function(){
+const job = schedule.scheduleJob('0 3,12,23 * * *', function(){
     getAllEvents();
   });
 
