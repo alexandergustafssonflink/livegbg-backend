@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const dotenv = require("dotenv")
 const Events = require("./models/events");
 const { MongoClient } = require("mongodb");
+const schedule = require('node-schedule');
 
 async function getPustervikEvents(browser) {
     const page = await browser.newPage();
@@ -247,6 +248,10 @@ async function getAllEvents() {
     //     console.log(error);
     //   }
 }
+
+const job = schedule.scheduleJob('*/3 * * * *', function(){
+    getAllEvents();
+  });
 
 // getAllEvents();
 
