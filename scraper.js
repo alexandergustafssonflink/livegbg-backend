@@ -3,12 +3,7 @@ const mongoose = require("mongoose");
 const dotenv = require("dotenv")
 const Events = require("./models/events");
 const { MongoClient } = require("mongodb");
-
-dotenv.config();
-
-
-mongoose.connect(process.env.DB_CONNECT, 
-    () => console.log("CONNECTED TO DB"));
+const schedule = require('node-schedule');
 
 async function getPustervikEvents(browser) {
     const page = await browser.newPage();
@@ -77,8 +72,6 @@ async function getOceanenEvents(browser) {
     return events
 
 } 
-
-
 
 async function getMusikensHusEvents (browser) {
         const page = await browser.newPage();
@@ -170,7 +163,6 @@ async function getNefertitiEvents(browser) {
         return events
 }
 
-
 function formatPustervikEvents(events) {
     let year = Number(new Date().toString().split(" ")[3]);
     for (let i = 0; i < events.length; i++) {
@@ -195,16 +187,30 @@ function formatPustervikEvents(events) {
 }
 
 async function getAllEvents() {
-    const browser = await puppeteer.launch({
+    dotenv.config();
+    mongoose.connect(process.env.DB_CONNECT, 
+    () => console.log("CONNECTED TO DB"));
+
+    // const browser = await puppeteer.launch({
+    //     headless: true,
+    //     args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    //   });
+
+        const browser = await puppeteer.launch({
         headless: true,
-        args: ["--no-sandbox", "--disable-setuid-sandbox"],
+        args: ["--no-sandbox"],
       });
+    console.log("GETTING PUSTERVIK!");
     const pEvents = await getPustervikEvents(browser);
-    
+    console.log("FORMATTING PUSTERVIK!");
     const pustervikEvents = formatPustervikEvents(pEvents)
+    console.log("GETTING OCEANEN!");
     const oceanenEvents = await getOceanenEvents(browser);
 
+    console.log("GETTING MUSIKENS HUS!");
+
     const musikensHusEvents = await getMusikensHusEvents(browser);
+    console.log("GETTING Nefertiti!");
     const nefertitiEvents = await getNefertitiEvents(browser);
 
 
@@ -216,8 +222,11 @@ async function getAllEvents() {
         events: allEvents
     });
 
+    console.log("INSERTING!");
+
     try {
         const savedEvents = await events.save();
+        console.log("Done!")
         // console.log(savedEvents);
     } catch (error) {
         console.log(error);
@@ -240,8 +249,13 @@ async function getAllEvents() {
     //   }
 }
 
-getAllEvents();
+const job = schedule.scheduleJob('0 */2 * * *', function(){
+    getAllEvents();
+  });
 
+// getAllEvents();
+
+module.exports.getAllEvents = getAllEvents;
 //console.log(allLinks);
 
     // for(let i = 0; i < allLinks.length; i++) {
