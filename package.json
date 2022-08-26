@@ -15,7 +15,9 @@
     "mongodb": "^4.9.0",
     "mongoose": "^6.5.2",
     "node-schedule": "^2.1.0",
-    "puppeteer": "^16.2.0"
+    "puppeteer": "^16.2.0",
+    "puppeteer-extra": "^3.3.4",
+    "puppeteer-extra-plugin-stealth": "^2.11.1"
   },
   "devDependencies": {
     "nodemon": "^2.0.19"

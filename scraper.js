@@ -1,15 +1,39 @@
-const puppeteer = require('puppeteer');
+// const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-extra')
+const StealthPlugin = require("puppeteer-extra-plugin-stealth");
 const mongoose = require("mongoose");
 const dotenv = require("dotenv")
 const Events = require("./models/events");
 const { MongoClient } = require("mongodb");
 const schedule = require('node-schedule');
 
+async function autoScroll(page){
+    await page.evaluate(async () => {
+        await new Promise((resolve, reject) => {
+            var totalHeight = 0;
+            var distance = 100;
+            var timer = setInterval(() => {
+                var scrollHeight = document.body.scrollHeight;
+                window.scrollBy(0, distance);
+                totalHeight += distance;
+
+                if(totalHeight >= scrollHeight - window.innerHeight){
+                    clearInterval(timer);
+                    resolve();
+                }
+            }, 300);
+        });
+    });
+}
+
 async function getPustervikEvents(browser) {
     const page = await browser.newPage();
     page.setDefaultNavigationTimeout(0);
-    await page.goto("https://pustervik.nu/kalender/");
+    await page.goto("https://pustervik.nu/", {waitUntil : "networkidle0"});
+    await autoScroll(page);
+    await page.waitForTimeout(1000);
     const events = await page.evaluate(() =>
+    
     Array.from(
       document.querySelectorAll(
         ".single.event"
@@ -17,7 +41,8 @@ async function getPustervikEvents(browser) {
         (e) =>
         { 
             if(e.querySelector("h2").textContent.includes('konsert')) {
-                const div = document.querySelector('.img-holder')  
+                
+                const div = e.querySelector('.img-holder')  
                 const style = window.getComputedStyle(div, false)  
                 const image = style.backgroundImage.slice(4, -1).replace(/"/g, "")
                 return {
@@ -25,14 +50,33 @@ async function getPustervikEvents(browser) {
                     link: e.querySelector(".more-button").href,
                     tickets: e.querySelector("a.button.tickets")? e.querySelector("a.button.tickets").href : "",
                     imageUrl: image,
-                    date: e.querySelector("time").getAttribute("data-alt"),
+                    date:e.querySelector("time").textContent.replace(/(\r\n|\n|\r)/gm, "").replace("\t\t\t\t", "").replace("\t\t\t\t", ""),
                     place: "Pustervik",
                 } 
             }
         })   
   );
-    filteredEvents = events.filter(event => event !== null)
-    return filteredEvents
+    let fEvents = events.filter(event => event !== null)
+    let year = Number(new Date().toString().split(" ")[3]);
+    for (let i = 0; i < fEvents.length; i++) {
+        let event = fEvents[i];
+
+        if(event.date.includes("januari") && fEvents[i - 1].date.includes("december")) {
+            year++
+        }
+        let newDate = year + " " + event.date.split(" ")[2] + " " + event.date.split(" ")[1];
+
+        event.date = newDate;
+    }
+
+    for (let i = 0; i < fEvents.length; i++ ) {
+        fEvents[i].date = fEvents[i].date.replace("januari", "1").replace("februari", "2").replace("mars", "3").replace("april", "4").replace("maj", "5").replace("juni", "6").replace("juli", "7").replace("augusti", "8").replace("september", "9").replace("oktober", "10").replace("november", "11").replace("december", "12");
+        let year = fEvents[i].date.split(" ")[0];
+        let month = fEvents[i].date.split(" ")[1]
+        let day = fEvents[i].date.split(" ")[2];
+        fEvents[i].date = new Date(Date.UTC(year, month -1, day))
+    }
+    return fEvents;
 }
 
 async function getOceanenEvents(browser) {
@@ -101,7 +145,7 @@ async function getMusikensHusEvents (browser) {
         for(let i = 0; i < events.length; i++) {
             events[i].date = events[i].date.split("/")[0]
 
-            if(events[i].date.toLowerCase().includes("apr") && events[i - 1].date.toLowerCase().includes("dec") || events[i].date.toLowerCase().includes("mar") && events[i - 1].date.toLowerCase().includes("dec")|| events[i].date.includes("feb") && events[i - 1].date.includes("dec") || events[i].date.includes("jan") && events[i - 1].date.includes("dec")) {
+            if(events[i].date.toLowerCase().includes("apr") && events[i - 1].date.toLowerCase().includes("dec") || events[i].date.toLowerCase().includes("mar") && events[i - 1].date.toLowerCase().includes("dec")|| events[i].date.toLowerCase().includes("feb") && events[i - 1].date.toLowerCase().includes("dec") || events[i].date.toLowerCase().includes("jan") && events[i - 1].date.toLowerCase().includes("dec")) {
             // if(events[i].date.includes("Apr") && events[i - 1].date.includes("Dec") || events[i].date.includes("Mar") && events[i - 1].date.includes("Dec")|| events[i].date.includes("Feb") && events[i - 1].date.includes("Dec") || events[i].date.includes("Jan") && events[i - 1].date.includes("Dec")) {
                 year++
             }
@@ -163,56 +207,23 @@ async function getNefertitiEvents(browser) {
         return events
 }
 
-function formatPustervikEvents(events) {
-    let year = Number(new Date().toString().split(" ")[3]);
-    for (let i = 0; i < events.length; i++) {
-        let event = events[i];
-
-        if(event.date.includes("januari") && events[i - 1].date.includes("december")) {
-            year++
-        }
-        let newDate = year + " " + event.date.split(" ")[2] + " " + event.date.split(" ")[1];
-
-        event.date = newDate;
-    }
-
-    for (let i = 0; i < events.length; i++ ) {
-        events[i].date = events[i].date.replace("januari", "1").replace("februari", "2").replace("mars", "3").replace("april", "4").replace("maj", "5").replace("juni", "6").replace("juli", "7").replace("augusti", "8").replace("september", "9").replace("oktober", "10").replace("november", "11").replace("december", "12");
-        let year = events[i].date.split(" ")[0];
-        let month = events[i].date.split(" ")[1]
-        let day = events[i].date.split(" ")[2];
-        events[i].date = new Date(Date.UTC(year, month -1, day))
-    }
-    return events;
-}
 
 async function getAllEvents() {
     dotenv.config();
     mongoose.connect(process.env.DB_CONNECT, 
     () => console.log("CONNECTED TO DB"));
 
-    // const browser = await puppeteer.launch({
-    //     headless: true,
-    //     args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    //   });
-
+    puppeteer.use(StealthPlugin())
         const browser = await puppeteer.launch({
         headless: true,
         args: ["--no-sandbox"],
       });
     console.log("GETTING PUSTERVIK!");
-    const pEvents = await getPustervikEvents(browser);
-    console.log("FORMATTING PUSTERVIK!");
-    const pustervikEvents = formatPustervikEvents(pEvents)
-    console.log("GETTING OCEANEN!");
+    const pustervikEvents = await getPustervikEvents(browser);
     const oceanenEvents = await getOceanenEvents(browser);
-
-    console.log("GETTING MUSIKENS HUS!");
-
     const musikensHusEvents = await getMusikensHusEvents(browser);
     console.log("GETTING Nefertiti!");
     const nefertitiEvents = await getNefertitiEvents(browser);
-
 
     await browser.close();
     const allEvents = [ ...pustervikEvents, ...oceanenEvents, ...musikensHusEvents, ...nefertitiEvents ];
@@ -222,69 +233,18 @@ async function getAllEvents() {
         events: allEvents
     });
 
-    console.log("INSERTING!");
-
     try {
         const savedEvents = await events.save();
+        console.log(savedEvents)
         console.log("Done!")
         // console.log(savedEvents);
     } catch (error) {
         console.log(error);
     }
-    
-
-    //CONNECTING TO DATABASE AND INSERTING
-    // const client = new MongoClient(process.env.DB_CONNECT, {
-    //     useUnifiedTopology: true,
-    //   });
-    // await client.connect();
-    // const database =  client.db("konserter-gbg");
-    // const collection = database.collection("konserter");
-
-    // try {
-    //     const res = await collection.insertOne(data)
-    //     console.log(res);
-    // } catch (error) {   
-    //     console.log(error);
-    //   }
 }
 
 const job = schedule.scheduleJob('0 */2 * * *', function(){
     getAllEvents();
   });
 
-// getAllEvents();
-
 module.exports.getAllEvents = getAllEvents;
-//console.log(allLinks);
-
-    // for(let i = 0; i < allLinks.length; i++) {
-    //     await page.goto(allLinks[i]);
-    //     // await page.waitForNavigation({waitUntil: 'networkidle0'}) 
-    //     await page.waitForSelector('.event-title')
-    //     title = await page.evaluate(() => {
-    //         return document.querySelector(".event-title").textContent
-    //     })
-    //     if(title.includes("Nattklubb") || title.includes('wrestling')) {
-    //         continue;
-    //     }
-    //     date = await page.evaluate(() => {
-    //         return document.querySelector("tbody tr:nth-child(2) td:nth-child(2)").textContent.trim()
-    //     })
-
-    //     time = await page.evaluate(() => {
-    //         return document.querySelector("tbody tr:nth-child(4) td:nth-child(2)").textContent.trim()
-    //     })
-
-    //     price = await page.evaluate(() => {
-    //         return document.querySelector("tbody tr:nth-child(5) td:nth-child(2)").textContent.trim()
-    //     })
-    //     let concert = {
-    //         title: title,
-    //         date: date,
-    //         time: time,
-    //         price: price
-    //     }
-    //     concerts.push(concert)
-    // }
-    
