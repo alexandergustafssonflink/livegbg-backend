@@ -50,7 +50,7 @@ async function getPustervikEvents(browser) {
                     link: e.querySelector(".more-button").href,
                     tickets: e.querySelector("a.button.tickets")? e.querySelector("a.button.tickets").href : "",
                     imageUrl: image,
-                    date:e.querySelector("time").textContent.replace(/(\r\n|\n|\r)/gm, "").replace("\t\t\t\t", "").replace("\t\t\t\t", ""),
+                    date:e.querySelector("time").textContent.replace("idag ","").replace(/(\r\n|\n|\r)/gm, "").replace("\t\t\t\t", "").replace("\t\t\t\t", ""),
                     place: "Pustervik",
                 } 
             }
@@ -220,6 +220,7 @@ async function getAllEvents() {
       });
     console.log("GETTING PUSTERVIK!");
     const pustervikEvents = await getPustervikEvents(browser);
+    console.log(pustervikEvents)
     const oceanenEvents = await getOceanenEvents(browser);
     const musikensHusEvents = await getMusikensHusEvents(browser);
     console.log("GETTING Nefertiti!");
