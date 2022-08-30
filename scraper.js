@@ -84,14 +84,15 @@ async function getOceanenEvents(browser) {
         page.setDefaultNavigationTimeout(0);
         await page.goto("https://www.oceanen.com/");
 
-        const events = await page.evaluate(() =>
+        let events = await page.evaluate(() =>
         Array.from(
           document.querySelectorAll(
             ".upcoming-events li"
             ),
             (e) =>
             { 
-                const dateString = e.getElementsByTagName("time")[0].getAttribute("datetime");
+                if(!e.querySelector("h3").textContent.includes("Studentradio") && !e.querySelector("h3").textContent.includes("Standup")) {
+                    const dateString = e.getElementsByTagName("time")[0].getAttribute("datetime");
                 // const year = dateString.split("-")[0]
                 // const month = dateString.split("-")[1]
                 // const day = dateString.split("-")[2].split(" ")[0]
@@ -103,8 +104,11 @@ async function getOceanenEvents(browser) {
                     date: dateString,
                     place: "Oceanen",
                 }
+                }
+                
             })   
       );
+      events = events.filter(event => event !== null)
       for(let i = 0; i < events.length; i++) {
         let event = events[i];
         const year = event.date.split("-")[0]
@@ -122,14 +126,14 @@ async function getMusikensHusEvents (browser) {
         page.setDefaultNavigationTimeout(0);
         await page.goto("https://www.musikenshus.se/kalender");
 
-        const events = await page.evaluate(() =>
+        let events = await page.evaluate(() =>
         Array.from(
           document.querySelectorAll(
             ".cmsnycontent-box"
             ),
             (e) =>
             { 
-                if(e.querySelector(".cmscontent-date h4").textContent) {
+                if(e.querySelector(".cmscontent-date h4").textContent && !e.querySelector("h2").textContent.toLowerCase().includes("poetry slam") && !e.querySelector("h2").textContent.toLowerCase().includes("poesi & prosa") && !e.querySelector("h2").textContent.toLowerCase().includes("standup")) {
                     return {
                         title: e.querySelector("h2").textContent,
                         link: e.querySelector("a").href,
@@ -141,6 +145,8 @@ async function getMusikensHusEvents (browser) {
    
             })   
       );
+
+        events = events.filter(event => event !== null)
         let year = Number(new Date().toString().split(" ")[3]);
         for(let i = 0; i < events.length; i++) {
             events[i].date = events[i].date.split("/")[0]
@@ -170,23 +176,26 @@ async function getNefertitiEvents(browser) {
         const loadBtn = await page.waitForSelector('.load-more');
         await page.$eval('.load-more', btn => btn.click() );
         await page.waitForTimeout(1000);
-        const events = await page.evaluate(() =>
+        let events = await page.evaluate(() =>
         Array.from(
           document.querySelectorAll(
             ".posts-nefertiti_event .spajder-post"
             ),
             (e) =>
-           
             { 
-                return {
-                    title: e.querySelector("h2").textContent,
-                    link: e.querySelector(".readmore").href,
-                    imageUrl: e.getElementsByTagName("img")[0].src,
-                    date: e.querySelector(".timestamp.heading").textContent,
-                    place: "Nefertiti"
+                const title = e.querySelector("h2").textContent;
+                if(!title.includes("Colors")) {
+                    return {
+                        title: title,
+                        link: e.querySelector(".readmore").href,
+                        imageUrl: e.getElementsByTagName("img")[0].src,
+                        date: e.querySelector(".timestamp.heading").textContent,
+                        place: "Nefertiti"
+                    }
                 }
             })   
       );
+        events = events.filter(event => event !== null)
         let year = Number(new Date().toString().split(" ")[3]);
         for(let i = 0; i < events.length; i++) {
             // events[i].date = events[i].date.replace(/\s\s+/g, ' ').split(" ")[1] + " " + events[i].date.split(" ")[2];
@@ -220,10 +229,14 @@ async function getAllEvents() {
       });
     console.log("GETTING PUSTERVIK!");
     const pustervikEvents = await getPustervikEvents(browser);
-    console.log(pustervikEvents)
+
+    console.log("GETTING OCEANEN!");
     const oceanenEvents = await getOceanenEvents(browser);
+
+    console.log("GETTING MUSIKENS HUS!");
     const musikensHusEvents = await getMusikensHusEvents(browser);
-    console.log("GETTING Nefertiti!");
+
+    console.log("GETTING NEF!");
     const nefertitiEvents = await getNefertitiEvents(browser);
 
     await browser.close();
