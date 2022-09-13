@@ -14,7 +14,7 @@ mongoose.connect(process.env.DB_CONNECT,
 // Middleware
 
 app.use(function(req, res, next) {
-    const allowedOrigins = ['http://localhost:8080', 'https://livegbg.vercel.app'];
+    const allowedOrigins = ['http://localhost:8080', 'https://livegbg.vercel.app', 'https://www.livegbg.se/', 'https://livegbg.se/'];
     const origin = req.headers.origin;
     if (allowedOrigins.includes(origin)) {
          res.setHeader('Access-Control-Allow-Origin', origin);
