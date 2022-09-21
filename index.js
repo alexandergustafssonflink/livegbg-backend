@@ -4,6 +4,7 @@ const dotenv = require("dotenv");
 const mongoose = require("mongoose");
 const { MongoClient } = require("mongodb");
 const eventsRoute = require("./routes/events")
+const artistRoute = require("./routes/artist")
 
 dotenv.config();
 
@@ -31,6 +32,7 @@ app.use(function(req, res, next) {
 app.use(express.json())
 
 app.use("/api/events", eventsRoute);
+app.use("/api/artist", artistRoute);
 
 
 app.listen(process.env.PORT || 3000, () => console.log(("Server is on!")))

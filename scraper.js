@@ -4,8 +4,12 @@ const StealthPlugin = require("puppeteer-extra-plugin-stealth");
 const mongoose = require("mongoose");
 const dotenv = require("dotenv")
 const Events = require("./models/events");
+const Artist = require("./models/artist");
 const { MongoClient } = require("mongodb");
 const schedule = require('node-schedule');
+const axios = require("axios");
+
+dotenv.config();
 
 async function autoScroll(page){
     await page.evaluate(async () => {
@@ -241,6 +245,9 @@ async function getAllEvents() {
 
     await browser.close();
     const allEvents = [ ...pustervikEvents, ...oceanenEvents, ...musikensHusEvents, ...nefertitiEvents ];
+      console.log(allEvents.length);
+
+    await checkAndGetArtistInfo(allEvents)
 
     const events = new Events({
         date: new Date(),
@@ -249,7 +256,6 @@ async function getAllEvents() {
 
     try {
         const savedEvents = await events.save();
-        console.log(savedEvents)
         console.log("Done!")
         // console.log(savedEvents);
     } catch (error) {
@@ -257,7 +263,134 @@ async function getAllEvents() {
     }
 }
 
-const job = schedule.scheduleJob('0 */2 * * *', function(){
+const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+
+async function checkAndGetArtistInfo(allEvents) {
+            for (let i = 0; i < allEvents.length; i++) {
+            const artistName = allEvents[i].title;
+            const foundArtist = await Artist.find({name: artistName});
+            if(!foundArtist.length) {
+                const artistInfo = await getArtistInfo(artistName);
+                const artist = new Artist({
+                    name: artistName,
+                    info: artistInfo ? artistInfo : null,
+                    date: new Date(),
+                })
+                const savedArtist = await artist.save();
+                console.log(savedArtist)
+            }
+
+                await sleep(300);
+            }
+
+  
+
+}
+
+async function getArtistInfo(artist) {
+    const options = {
+        method: 'GET',
+        url: 'https://shazam.p.rapidapi.com/search',
+        params: {term: artist, locale: 'en-US', offset: '0', limit: '5'},
+        headers: {
+            'X-RapidAPI-Key': process.env.VUE_APP_SHAZAM_KEY,
+            'X-RapidAPI-Host': 'shazam.p.rapidapi.com'
+        }
+        };
+    
+        const {data} = await axios.request(options);
+        if(data.tracks) {
+            return data;
+        } else {
+            if(artist.includes("+")) {
+                const splittedArtist = artist.split("+")[0];
+                const options = {
+                method: 'GET',
+                url: 'https://shazam.p.rapidapi.com/search',
+                params: {term: splittedArtist, locale: 'en-US', offset: '0', limit: '5'},
+                headers: {
+                    'X-RapidAPI-Key': process.env.VUE_APP_SHAZAM_KEY,
+                    'X-RapidAPI-Host': 'shazam.p.rapidapi.com'
+                }
+                };
+
+                const { data } = await axios.request(options);
+                if(data.tracks) {
+                    return data;
+                } 
+            } else if(artist.includes("#")) {
+                const splittedArtist = artist.split("#")[0];
+                const options = {
+                method: 'GET',
+                url: 'https://shazam.p.rapidapi.com/search',
+                params: {term: splittedArtist, locale: 'en-US', offset: '0', limit: '5'},
+                headers: {
+                    'X-RapidAPI-Key': process.env.VUE_APP_SHAZAM_KEY,
+                    'X-RapidAPI-Host': 'shazam.p.rapidapi.com'
+                }
+                };
+
+                const { data } = await axios.request(options);
+                if(data.tracks) {
+                    return data;
+                } 
+            }
+            else if(artist.includes(" med ")) {
+                const splittedArtist = artist.split(" med ")[0];
+                const options = {
+                method: 'GET',
+                url: 'https://shazam.p.rapidapi.com/search',
+                params: {term: splittedArtist, locale: 'en-US', offset: '0', limit: '5'},
+                headers: {
+                    'X-RapidAPI-Key': process.env.VUE_APP_SHAZAM_KEY,
+                    'X-RapidAPI-Host': 'shazam.p.rapidapi.com'
+                }
+                };
+
+                const { data } = await axios.request(options);
+                if(data.tracks) {
+                    return data;
+                } 
+            }
+            else if(artist.includes(" och ")) {
+                const splittedArtist = artist.split(" och ")[0];
+                const options = {
+                method: 'GET',
+                url: 'https://shazam.p.rapidapi.com/search',
+                params: {term: splittedArtist, locale: 'en-US', offset: '0', limit: '5'},
+                headers: {
+                    'X-RapidAPI-Key': process.env.VUE_APP_SHAZAM_KEY,
+                    'X-RapidAPI-Host': 'shazam.p.rapidapi.com'
+                }
+                };
+
+                const { data } = await axios.request(options);
+                if(data.tracks) {
+                    return data;
+                } 
+            }
+            else if(artist.includes("Nytt Datum - ")) {
+                const splittedArtist = artist.split("Nytt Datum - ")[1];
+                const options = {
+                method: 'GET',
+                url: 'https://shazam.p.rapidapi.com/search',
+                params: {term: splittedArtist, locale: 'en-US', offset: '0', limit: '5'},
+                headers: {
+                    'X-RapidAPI-Key': process.env.VUE_APP_SHAZAM_KEY,
+                    'X-RapidAPI-Host': 'shazam.p.rapidapi.com'
+                }
+                };
+
+                const { data } = await axios.request(options);
+                if(data.tracks) {
+                    return data;
+                } 
+            }
+        }
+}
+
+
+const job = schedule.scheduleJob('0 */4 * * *', function(){
     getAllEvents();
   });
 
