@@ -302,8 +302,8 @@ async function getArtistInfo(artist) {
         if(data.tracks) {
             return data;
         } else {
-            if(artist.includes("+")) {
-                const splittedArtist = artist.split("+")[0];
+            if(artist.includes(" + ")) {
+                const splittedArtist = artist.split(" + ")[0];
                 const options = {
                 method: 'GET',
                 url: 'https://shazam.p.rapidapi.com/search',
@@ -369,8 +369,8 @@ async function getArtistInfo(artist) {
                     return data;
                 } 
             }
-            else if(artist.includes("Nytt Datum - ")) {
-                const splittedArtist = artist.split("Nytt Datum - ")[1];
+            else if(artist.toLowerCase().includes("nytt datum")) {
+                const splittedArtist = artist.toLowerCase().split("nytt datum")[1];
                 const options = {
                 method: 'GET',
                 url: 'https://shazam.p.rapidapi.com/search',
