@@ -44,7 +44,7 @@ async function getPustervikEvents(browser) {
         ),
         (e) =>
         { 
-            if(e.querySelector("h2").textContent.includes('konsert')) {
+            // if(e.querySelector("h2").textContent.includes('konsert')) {
                 
                 const div = e.querySelector('.img-holder')  
                 const style = window.getComputedStyle(div, false)  
@@ -57,7 +57,7 @@ async function getPustervikEvents(browser) {
                     date:e.querySelector("time").textContent.replace("idag ","").replace(/(\r\n|\n|\r)/gm, "").replace("\t\t\t\t", "").replace("\t\t\t\t", ""),
                     place: "Pustervik",
                 } 
-            }
+            //}
         })   
   );
     let fEvents = events.filter(event => event !== null)
