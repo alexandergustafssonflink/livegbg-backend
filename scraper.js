@@ -220,6 +220,104 @@ async function getNefertitiEvents(browser) {
         return events
 }
 
+async function getValandEvents(browser) {
+    const page = await browser.newPage();
+    page.setDefaultNavigationTimeout(0);
+    await page.goto("http://valand.se/kalender/");
+
+    await page.waitForTimeout(1000);
+    let events = await page.evaluate(() =>
+    Array.from(
+      document.querySelectorAll(
+        ".event"
+        ),
+        (e) =>
+        {    
+            // const div = e.querySelector('.img-holder')  
+            const style = window.getComputedStyle(e, false)  
+            const image = style.backgroundImage.slice(4, -1).replace(/"/g, "")
+            const title = e.querySelector("h3").textContent
+            if(!title.includes("is here to stay")) {
+                return {
+                    title: e.querySelector("h3").textContent,
+                    link: e.querySelector("a").href,
+                    imageUrl: image,
+                    date: e.querySelector("a :nth-child(3)").textContent.trim().replace(/(\r\n|\n|\r)/gm, "").replace(",",""),
+                    place: "Valand"
+                }
+            }
+        })  
+    );
+
+    events = events.filter(event => event !== null)
+    for(let i = 0; i < events.length; i++) {
+        let dateString = events[i].date.replace("januari", "01").replace("februari", "02").replace("mars", "03").replace("april", "04").replace("maj", "05").replace("juni", "06").replace("juli", "07").replace("augusti", "08").replace("september", "09").replace("oktober", "10").replace("november","11").replace("december", "12");
+        events[i].date = new Date(Date.UTC(dateString.split(" ")[2], dateString.split(" ")[1] -1, dateString.split(" ")[0]))
+    }
+
+  return events;
+}
+
+async function getTragarnEvents(browser) {
+    const page = await browser.newPage();
+    page.setDefaultNavigationTimeout(0);
+    await page.goto("https://www.tradgarn.se/konsert/");
+
+    await page.waitForTimeout(1000);
+    let events = await page.evaluate(() =>
+    Array.from(
+      document.querySelectorAll(
+        ".res.full"
+        ),
+        (e) =>
+        {    
+            return {
+                title: e.querySelector("h2").textContent,
+                link: e.querySelector("a").href,
+                imageUrl: e.querySelector("img").src,
+                date: e.querySelector(".day").textContent + " " + e.querySelector(".month").textContent,
+                place: "Trägårn"
+            }
+        }) 
+    );
+
+    events = events.filter(event => event !== null)
+
+    let year = Number(new Date().toString().split(" ")[3]);
+    for(let i = 0; i < events.length; i++) {
+        if(events[i].date.toLowerCase().includes("apr") && events[i - 1].date.toLowerCase().includes("dec") || events[i].date.toLowerCase().includes("mar") && events[i - 1].date.toLowerCase().includes("dec")|| events[i].date.toLowerCase().includes("feb") && events[i - 1].date.toLowerCase().includes("dec") || events[i].date.toLowerCase().includes("jan") && events[i - 1].date.toLowerCase().includes("dec")) {
+        // if(events[i].date.includes("Apr") && events[i - 1].date.includes("Dec") || events[i].date.includes("Mar") && events[i - 1].date.includes("Dec")|| events[i].date.includes("Feb") && events[i - 1].date.includes("Dec") || events[i].date.includes("Jan") && events[i - 1].date.includes("Dec")) {
+            year++
+        }
+        events[i].date = year + " " + events[i].date;
+    }
+
+    for(let i = 0; i < events.length; i++) {
+        let dateString = events[i].date.replace("Jan", "01").replace("Feb", "02").replace("Mar", "03").replace("Apr", "04").replace("Maj", "05").replace("Jun", "06").replace("Jul", "07").replace("Aug", "08").replace("Sep", "09").replace("Okt", "10").replace("Nov","11").replace("Dec", "12");
+        events[i].date = new Date(Date.UTC(dateString.split(" ")[0], dateString.split(" ")[2] -1, dateString.split(" ")[1]))
+
+    }
+
+    return events;
+}
+
+// async function test() {
+//     dotenv.config();
+//     mongoose.connect(process.env.DB_CONNECT, 
+//         () => console.log("CONNECTED TO DB"));
+    
+//         puppeteer.use(StealthPlugin())
+//             const browser = await puppeteer.launch({
+//             headless: false,
+//             args: ["--no-sandbox"],
+//         });
+
+//         const valandEvents = await getTragarnEvents(browser);
+//         console.log(valandEvents);
+
+//         await browser.close();
+// }
+
 
 async function getAllEvents() {
     dotenv.config();
@@ -243,9 +341,14 @@ async function getAllEvents() {
     console.log("GETTING NEF!");
     const nefertitiEvents = await getNefertitiEvents(browser);
 
+    console.log("GETTING VALAND!");
+    const valandEvents = await getValandEvents(browser);
+
+    console.log("GETTING TRÄGÅRN!");
+    const tragarnEvents = await getTragarnEvents(browser);
+
     await browser.close();
-    const allEvents = [ ...pustervikEvents, ...oceanenEvents, ...musikensHusEvents, ...nefertitiEvents ];
-      console.log(allEvents.length);
+    const allEvents = [ ...pustervikEvents, ...oceanenEvents, ...musikensHusEvents, ...nefertitiEvents, ...valandEvents, ...tragarnEvents ];
 
     await checkAndGetArtistInfo(allEvents)
 
@@ -288,6 +391,7 @@ async function checkAndGetArtistInfo(allEvents) {
 }
 
 async function getArtistInfo(artist) {
+    console.log("JEK" + artist)
     const options = {
         method: 'GET',
         url: 'https://shazam.p.rapidapi.com/search',
@@ -299,94 +403,107 @@ async function getArtistInfo(artist) {
         };
     
         const {data} = await axios.request(options);
-        if(data.tracks) {
-            return data;
-        } else {
-            if(artist.includes(" + ")) {
-                const splittedArtist = artist.split(" + ")[0];
-                const options = {
-                method: 'GET',
-                url: 'https://shazam.p.rapidapi.com/search',
-                params: {term: splittedArtist, locale: 'en-US', offset: '0', limit: '5'},
-                headers: {
-                    'X-RapidAPI-Key': process.env.VUE_APP_SHAZAM_KEY,
-                    'X-RapidAPI-Host': 'shazam.p.rapidapi.com'
+            if(data.artists?.hits[0].artist.name.split(" ")[0].includes(artist.split(" ")[0])) {
+                return data;
+            } else {
+                if(artist.includes(" + ")) {
+                    const splittedArtist = artist.split(" + ")[0];
+                    const options = {
+                    method: 'GET',
+                    url: 'https://shazam.p.rapidapi.com/search',
+                    params: {term: splittedArtist, locale: 'en-US', offset: '0', limit: '5'},
+                    headers: {
+                        'X-RapidAPI-Key': process.env.VUE_APP_SHAZAM_KEY,
+                        'X-RapidAPI-Host': 'shazam.p.rapidapi.com'
+                    }
+                    };
+    
+                    const { data } = await axios.request(options);
+                    if(data.artists) {
+                        if(data.artists.hits[0].artist.name.split(" ")[0].includes(splittedArtist.split(" ")[0])) {
+                            return data;
+                        } 
+                    }
+    
+                } else if(artist.includes("#")) {
+                    const splittedArtist = artist.split("#")[0];
+                    const options = {
+                    method: 'GET',
+                    url: 'https://shazam.p.rapidapi.com/search',
+                    params: {term: splittedArtist, locale: 'en-US', offset: '0', limit: '5'},
+                    headers: {
+                        'X-RapidAPI-Key': process.env.VUE_APP_SHAZAM_KEY,
+                        'X-RapidAPI-Host': 'shazam.p.rapidapi.com'
+                    }
+                    };
+    
+                    const { data } = await axios.request(options);
+                    if(data.artists) {
+                        if(data.artists.hits[0].artist.name.split(" ")[0].includes(splittedArtist.split(" ")[0])) {
+                            return data;
+                        } 
+                    }
                 }
-                };
-
-                const { data } = await axios.request(options);
-                if(data.tracks) {
-                    return data;
-                } 
-            } else if(artist.includes("#")) {
-                const splittedArtist = artist.split("#")[0];
-                const options = {
-                method: 'GET',
-                url: 'https://shazam.p.rapidapi.com/search',
-                params: {term: splittedArtist, locale: 'en-US', offset: '0', limit: '5'},
-                headers: {
-                    'X-RapidAPI-Key': process.env.VUE_APP_SHAZAM_KEY,
-                    'X-RapidAPI-Host': 'shazam.p.rapidapi.com'
+                else if(artist.includes(" med ")) {
+                    const splittedArtist = artist.split(" med ")[0];
+                    const options = {
+                    method: 'GET',
+                    url: 'https://shazam.p.rapidapi.com/search',
+                    params: {term: splittedArtist, locale: 'en-US', offset: '0', limit: '5'},
+                    headers: {
+                        'X-RapidAPI-Key': process.env.VUE_APP_SHAZAM_KEY,
+                        'X-RapidAPI-Host': 'shazam.p.rapidapi.com'
+                    }
+                    };
+    
+                    const { data } = await axios.request(options);
+                    if(data.artists) {
+                        if(data.artists.hits[0].artist.name.split(" ")[0].includes(splittedArtist.split(" ")[0])) {
+                            return data;
+                        } 
+                    }
                 }
-                };
-
-                const { data } = await axios.request(options);
-                if(data.tracks) {
-                    return data;
-                } 
+                else if(artist.includes(" och ")) {
+                    const splittedArtist = artist.split(" och ")[0];
+                    const options = {
+                    method: 'GET',
+                    url: 'https://shazam.p.rapidapi.com/search',
+                    params: {term: splittedArtist, locale: 'en-US', offset: '0', limit: '5'},
+                    headers: {
+                        'X-RapidAPI-Key': process.env.VUE_APP_SHAZAM_KEY,
+                        'X-RapidAPI-Host': 'shazam.p.rapidapi.com'
+                    }
+                    };
+    
+                    const { data } = await axios.request(options);
+                    if(data.artists) {
+                        if(data.artists.hits[0].artist.name.split(" ")[0].includes(splittedArtist.split(" ")[0])) {
+                            return data;
+                        } 
+                    }
+                }
+                else if(artist.toLowerCase().includes("nytt datum")) {
+                    const splittedArtist = artist.toLowerCase().split("nytt datum")[1];
+                    const options = {
+                    method: 'GET',
+                    url: 'https://shazam.p.rapidapi.com/search',
+                    params: {term: splittedArtist, locale: 'en-US', offset: '0', limit: '5'},
+                    headers: {
+                        'X-RapidAPI-Key': process.env.VUE_APP_SHAZAM_KEY,
+                        'X-RapidAPI-Host': 'shazam.p.rapidapi.com'
+                    }
+                    };
+    
+                    const { data } = await axios.request(options);
+                    console.log(data)
+                    if(data.artists) {
+                        if(data.artists.hits[0].artist.name.split(" ")[0].includes(splittedArtist.split(" ")[0])) {
+                            return data;
+                        } 
+                    }
+                }
             }
-            else if(artist.includes(" med ")) {
-                const splittedArtist = artist.split(" med ")[0];
-                const options = {
-                method: 'GET',
-                url: 'https://shazam.p.rapidapi.com/search',
-                params: {term: splittedArtist, locale: 'en-US', offset: '0', limit: '5'},
-                headers: {
-                    'X-RapidAPI-Key': process.env.VUE_APP_SHAZAM_KEY,
-                    'X-RapidAPI-Host': 'shazam.p.rapidapi.com'
-                }
-                };
-
-                const { data } = await axios.request(options);
-                if(data.tracks) {
-                    return data;
-                } 
-            }
-            else if(artist.includes(" och ")) {
-                const splittedArtist = artist.split(" och ")[0];
-                const options = {
-                method: 'GET',
-                url: 'https://shazam.p.rapidapi.com/search',
-                params: {term: splittedArtist, locale: 'en-US', offset: '0', limit: '5'},
-                headers: {
-                    'X-RapidAPI-Key': process.env.VUE_APP_SHAZAM_KEY,
-                    'X-RapidAPI-Host': 'shazam.p.rapidapi.com'
-                }
-                };
-
-                const { data } = await axios.request(options);
-                if(data.tracks) {
-                    return data;
-                } 
-            }
-            else if(artist.toLowerCase().includes("nytt datum")) {
-                const splittedArtist = artist.toLowerCase().split("nytt datum")[1];
-                const options = {
-                method: 'GET',
-                url: 'https://shazam.p.rapidapi.com/search',
-                params: {term: splittedArtist, locale: 'en-US', offset: '0', limit: '5'},
-                headers: {
-                    'X-RapidAPI-Key': process.env.VUE_APP_SHAZAM_KEY,
-                    'X-RapidAPI-Host': 'shazam.p.rapidapi.com'
-                }
-                };
-
-                const { data } = await axios.request(options);
-                if(data.tracks) {
-                    return data;
-                } 
-            }
-        }
+        
 }
 
 
