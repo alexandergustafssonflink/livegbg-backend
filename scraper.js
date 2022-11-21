@@ -44,7 +44,7 @@ async function getPustervikEvents(browser) {
         ),
         (e) =>
         { 
-            // if(e.querySelector("h2").textContent.includes('konsert')) {
+            if(!e.querySelector("h2").textContent.toLowerCase().includes('event')) {
                 
                 const div = e.querySelector('.img-holder')  
                 const style = window.getComputedStyle(div, false)  
@@ -57,7 +57,7 @@ async function getPustervikEvents(browser) {
                     date:e.querySelector("time").textContent.replace("idag ","").replace(/(\r\n|\n|\r)/gm, "").replace("\t\t\t\t", "").replace("\t\t\t\t", ""),
                     place: "Pustervik",
                 } 
-            //}
+            }
         })   
   );
     let fEvents = events.filter(event => event !== null)
@@ -348,9 +348,11 @@ async function getAllEvents() {
     const tragarnEvents = await getTragarnEvents(browser);
 
     await browser.close();
-    const allEvents = [ ...pustervikEvents, ...oceanenEvents, ...musikensHusEvents, ...nefertitiEvents, ...valandEvents, ...tragarnEvents ];
+    let allEvents = [ ...pustervikEvents, ...oceanenEvents, ...musikensHusEvents, ...nefertitiEvents, ...valandEvents, ...tragarnEvents ];
 
-    await checkAndGetArtistInfo(allEvents)
+    allEvents = filterOutNonMusic(allEvents);
+
+    await checkAndGetArtistInfo(allEvents);
 
     const events = new Events({
         date: new Date(),
@@ -367,6 +369,11 @@ async function getAllEvents() {
 }
 
 const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+
+function filterOutNonMusic(events) {
+    let filtered = events.filter(event => !event.title.toLowerCase().includes("wrestl") && !event.title.toLowerCase().includes("forskare") && !event.title.toLowerCase().includes("danscentrum") && !event.title.toLowerCase().includes("poesi"));
+    return filtered;
+}
 
 async function checkAndGetArtistInfo(allEvents) {
             for (let i = 0; i < allEvents.length; i++) {
@@ -391,7 +398,6 @@ async function checkAndGetArtistInfo(allEvents) {
 }
 
 async function getArtistInfo(artist) {
-    console.log("JEK" + artist)
     const options = {
         method: 'GET',
         url: 'https://shazam.p.rapidapi.com/search',
@@ -505,7 +511,6 @@ async function getArtistInfo(artist) {
             }
         
 }
-
 
 const job = schedule.scheduleJob('0 */4 * * *', function(){
     getAllEvents();
