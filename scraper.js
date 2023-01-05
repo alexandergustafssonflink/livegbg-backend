@@ -65,7 +65,7 @@ async function getPustervikEvents(browser) {
     for (let i = 0; i < fEvents.length; i++) {
         let event = fEvents[i];
 
-        if(event.date.includes("januari") && fEvents[i - 1].date.includes("december")) {
+        if(event.date.includes("januari") && fEvents[i - 1]?.date.includes("december")) {
             year++
         }
         let newDate = year + " " + event.date.split(" ")[2] + " " + event.date.split(" ")[1];
@@ -155,7 +155,7 @@ async function getMusikensHusEvents (browser) {
         for(let i = 0; i < events.length; i++) {
             events[i].date = events[i].date.split("/")[0]
 
-            if(events[i].date.toLowerCase().includes("apr") && events[i - 1].date.toLowerCase().includes("dec") || events[i].date.toLowerCase().includes("mar") && events[i - 1].date.toLowerCase().includes("dec")|| events[i].date.toLowerCase().includes("feb") && events[i - 1].date.toLowerCase().includes("dec") || events[i].date.toLowerCase().includes("jan") && events[i - 1].date.toLowerCase().includes("dec")) {
+            if(events[i].date.toLowerCase().includes("apr") && events[i - 1]?.date.toLowerCase().includes("dec") || events[i].date.toLowerCase().includes("mar") && events[i - 1]?.date.toLowerCase().includes("dec")|| events[i].date.toLowerCase().includes("feb") && events[i - 1]?.date.toLowerCase().includes("dec") || events[i].date.toLowerCase().includes("jan") && events[i - 1]?.date.toLowerCase().includes("dec")) {
             // if(events[i].date.includes("Apr") && events[i - 1].date.includes("Dec") || events[i].date.includes("Mar") && events[i - 1].date.includes("Dec")|| events[i].date.includes("Feb") && events[i - 1].date.includes("Dec") || events[i].date.includes("Jan") && events[i - 1].date.includes("Dec")) {
                 year++
             }
@@ -205,7 +205,7 @@ async function getNefertitiEvents(browser) {
             // events[i].date = events[i].date.replace(/\s\s+/g, ' ').split(" ")[1] + " " + events[i].date.split(" ")[2];
             events[i].date = events[i].date.replace(/\s\s+/g, ' ').split(" ")[1] + " " + events[i].date.replace(/\s\s+/g, ' ').split(" ")[2]
 
-            if(events[i].date.toLowerCase().includes("apr") && events[i - 1].date.toLowerCase().includes("dec") || events[i].date.toLowerCase().includes("mar") && events[i - 1].date.toLowerCase().includes("dec")|| events[i].date.includes("feb") && events[i - 1].date.includes("dec") || events[i].date.includes("jan") && events[i - 1].date.includes("dec")) {
+            if(events[i].date.toLowerCase().includes("apr") && events[i - 1]?.date.toLowerCase().includes("dec") || events[i].date.toLowerCase().includes("mar") && events[i - 1]?.date.toLowerCase().includes("dec")|| events[i].date.includes("feb") && events[i - 1]?.date.includes("dec") || events[i].date.includes("jan") && events[i - 1]?.date.includes("dec")) {
                 year++
             }
 
@@ -285,7 +285,7 @@ async function getTragarnEvents(browser) {
 
     let year = Number(new Date().toString().split(" ")[3]);
     for(let i = 0; i < events.length; i++) {
-        if(events[i].date.toLowerCase().includes("apr") && events[i - 1].date.toLowerCase().includes("dec") || events[i].date.toLowerCase().includes("mar") && events[i - 1].date.toLowerCase().includes("dec")|| events[i].date.toLowerCase().includes("feb") && events[i - 1].date.toLowerCase().includes("dec") || events[i].date.toLowerCase().includes("jan") && events[i - 1].date.toLowerCase().includes("dec")) {
+        if(events[i].date.toLowerCase().includes("apr") && events[i - 1]?.date.toLowerCase().includes("dec") || events[i].date.toLowerCase().includes("mar") && events[i - 1]?.date.toLowerCase().includes("dec")|| events[i].date.toLowerCase().includes("feb") && events[i - 1]?.date.toLowerCase().includes("dec") || events[i].date.toLowerCase().includes("jan") && events[i - 1]?.date.toLowerCase().includes("dec")) {
         // if(events[i].date.includes("Apr") && events[i - 1].date.includes("Dec") || events[i].date.includes("Mar") && events[i - 1].date.includes("Dec")|| events[i].date.includes("Feb") && events[i - 1].date.includes("Dec") || events[i].date.includes("Jan") && events[i - 1].date.includes("Dec")) {
             year++
         }
@@ -511,6 +511,7 @@ async function getArtistInfo(artist) {
             }
         
 }
+
 
 const job = schedule.scheduleJob('0 */4 * * *', function(){
     getAllEvents();
