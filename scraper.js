@@ -312,11 +312,47 @@ async function getTragarnEvents(browser) {
 //             args: ["--no-sandbox"],
 //         });
 
-//         const valandEvents = await getTragarnEvents(browser);
-//         console.log(valandEvents);
+//         const skeppetEvents = await getSkeppetEvents(browser);
+//         console.log(skeppetEvents);
 
 //         await browser.close();
 // }
+
+async function getSkeppetEvents(browser) {
+    const page = await browser.newPage();
+    page.setDefaultNavigationTimeout(0);
+    await page.goto("https://www.skeppetgbg.se/?post_type=tribe_events");
+
+    await page.waitForTimeout(1000);
+    let events = await page.evaluate(() =>
+    Array.from(
+      document.querySelectorAll(
+        ".tribe-events-calendar-list__event-wrapper"
+        ),
+        (e) =>
+        {    
+            return {
+                title: e.querySelector("h3 a").textContent.replace("\n\t\t", "").replace("\t", ""),
+                link: e.querySelector("a").href,
+                imageUrl: e.querySelector("img").src,
+                date: e.querySelector("time").getAttribute("datetime"),
+                place: "Skeppet"
+            }
+        }) 
+    );
+
+    events = events.filter(event => event !== null)
+
+    for(let i = 0; i < events.length; i++) {
+        let event = events[i];
+        const year = event.date.split("-")[0]
+        const month = event.date.split("-")[1]
+        const day = event.date.split("-")[2].split(" ")[0]
+
+        event.date = new Date(Date.UTC(year, month -1, day))
+    }
+    return events
+}
 
 
 async function getAllEvents() {
@@ -347,8 +383,11 @@ async function getAllEvents() {
     console.log("GETTING TRÄGÅRN!");
     const tragarnEvents = await getTragarnEvents(browser);
 
+    console.log("GETTING SKEPPET!!");
+    const skeppetEvents = await getSkeppetEvents(browser);
+
     await browser.close();
-    let allEvents = [ ...pustervikEvents, ...oceanenEvents, ...musikensHusEvents, ...nefertitiEvents, ...valandEvents, ...tragarnEvents ];
+    let allEvents = [ ...pustervikEvents, ...oceanenEvents, ...musikensHusEvents, ...nefertitiEvents, ...valandEvents, ...tragarnEvents, ...skeppetEvents ];
 
     allEvents = filterOutNonMusic(allEvents);
 
@@ -508,11 +547,31 @@ async function getArtistInfo(artist) {
                         } 
                     }
                 }
+                else if(artist.toLowerCase().includes("i salongen")) {
+                    const splittedArtist = artist.toLowerCase().split("i salongen")[0];
+                    const options = {
+                    method: 'GET',
+                    url: 'https://shazam.p.rapidapi.com/search',
+                    params: {term: splittedArtist, locale: 'en-US', offset: '0', limit: '5'},
+                    headers: {
+                        'X-RapidAPI-Key': process.env.VUE_APP_SHAZAM_KEY,
+                        'X-RapidAPI-Host': 'shazam.p.rapidapi.com'
+                    }
+                    };
+    
+                    const { data } = await axios.request(options);
+                    console.log(data)
+                    if(data.artists) {
+                        if(data.artists.hits[0].artist.name.split(" ")[0].includes(splittedArtist.split(" ")[0])) {
+                            return data;
+                        } 
+                    }
+                }
             }
         
 }
 
-
+// test()
 const job = schedule.scheduleJob('0 */4 * * *', function(){
     getAllEvents();
   });
