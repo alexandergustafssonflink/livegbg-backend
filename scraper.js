@@ -774,10 +774,10 @@ async function getArtistInfo(artist) {
 }
 
 // test()
-// const job = schedule.scheduleJob("0 */4 * * *", function () {
-//   getAllEvents();
-// });
-const job = schedule.scheduleJob("*/5 * * * *", function () {
+const job = schedule.scheduleJob("0 */4 * * *", function () {
   getAllEvents();
 });
+// const job = schedule.scheduleJob("*/5 * * * *", function () {
+//   getAllEvents();
+// });
 module.exports.getAllEvents = getAllEvents;
