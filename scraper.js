@@ -491,7 +491,7 @@ async function getAllEvents() {
 
   puppeteer.use(StealthPlugin());
   const browser = await puppeteer.launch({
-    headless: false,
+    headless: true,
     args: ["--no-sandbox"],
   });
   console.log("GETTING PUSTERVIK!");
