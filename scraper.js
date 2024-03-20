@@ -532,7 +532,7 @@ async function getAllEvents() {
   console.log("FILTERING OUT NON MUSIC EVENTS");
   allEvents = filterOutNonMusic(allEvents);
 
-  console.Console.log("CHECKING AND GETTING ARTIST INFO");
+  console.log("CHECKING AND GETTING ARTIST INFO");
   await checkAndGetArtistInfo(allEvents);
 
   console.log("CREATING EVENTS");
