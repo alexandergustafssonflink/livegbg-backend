@@ -99,6 +99,7 @@ async function getPustervikEvents(browser) {
     let day = fEvents[i].date.split(" ")[2];
     fEvents[i].date = new Date(Date.UTC(year, month - 1, day));
   }
+  await page.close();
   return fEvents;
 }
 
@@ -139,6 +140,7 @@ async function getOceanenEvents(browser) {
 
     event.date = new Date(Date.UTC(year, month - 1, day));
   }
+  // await page.close();
   return events;
 }
 
@@ -218,6 +220,7 @@ async function getMusikensHusEvents(browser) {
       )
     );
   }
+  // await page.close();
   return events;
 }
 
@@ -303,7 +306,7 @@ async function getNefertitiEvents(browser) {
       )
     );
   }
-  console.log(events);
+  // await page.close();
   return events;
 }
 
@@ -358,7 +361,7 @@ async function getValandEvents(browser) {
       )
     );
   }
-
+  // await page.close();
   return events;
 }
 
@@ -425,7 +428,7 @@ async function getTragarnEvents(browser) {
       )
     );
   }
-
+  // await page.close();
   return events;
 }
 
@@ -480,6 +483,7 @@ async function getSkeppetEvents(browser) {
 
     event.date = new Date(Date.UTC(year, month - 1, day));
   }
+  // await page.close();
   return events;
 }
 
@@ -537,10 +541,12 @@ async function getAllEvents() {
   try {
     const savedEvents = await events.save();
     console.log("Done!");
-    await browser.close();
-    // console.log(savedEvents);
   } catch (error) {
+    console.log("PROBLEM");
     console.log(error);
+  } finally {
+    // await browser.close();
+    process.exit();
   }
 }
 
