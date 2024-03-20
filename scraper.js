@@ -529,24 +529,28 @@ async function getAllEvents() {
     ...skeppetEvents,
   ];
 
+  console.log("FILTERING OUT NON MUSIC EVENTS");
   allEvents = filterOutNonMusic(allEvents);
 
+  console.Console.log("CHECKING AND GETTING ARTIST INFO");
   await checkAndGetArtistInfo(allEvents);
 
+  console.log("CREATING EVENTS");
   const events = new Events({
     date: new Date(),
     events: allEvents,
   });
 
   try {
+    console.log("SAVING EVENTS");
     const savedEvents = await events.save();
     console.log("Done!");
   } catch (error) {
     console.log("PROBLEM");
     console.log(error);
   } finally {
-    // await browser.close();
-    process.exit();
+    await browser.close();
+    // process.exit();
   }
 }
 
@@ -770,8 +774,10 @@ async function getArtistInfo(artist) {
 }
 
 // test()
-const job = schedule.scheduleJob("0 */4 * * *", function () {
+// const job = schedule.scheduleJob("0 */4 * * *", function () {
+//   getAllEvents();
+// });
+const job = schedule.scheduleJob("*/5 * * * *", function () {
   getAllEvents();
 });
-
 module.exports.getAllEvents = getAllEvents;
