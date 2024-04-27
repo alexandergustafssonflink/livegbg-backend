@@ -88,10 +88,10 @@ async function getAllEvents() {
 }
 
 // test()
-// const job = schedule.scheduleJob("0 */4 * * *", function () {
-//   getAllEvents();
-// });
-getAllEvents();
+const job = schedule.scheduleJob("0 */4 * * *", function () {
+  getAllEvents();
+});
+// getAllEvents();
 // const job = schedule.scheduleJob("*/5 * * * *", function () {
 //   getAllEvents();
 // });
