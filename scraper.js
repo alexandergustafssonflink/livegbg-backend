@@ -31,6 +31,7 @@ async function getAllEvents() {
     headless: true,
     args: ["--no-sandbox"],
   });
+
   console.log("GETTING PUSTERVIK!");
   const pustervikEvents = await getPustervikEvents(browser);
 
