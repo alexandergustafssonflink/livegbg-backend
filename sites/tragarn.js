@@ -5,7 +5,7 @@ async function getTragarnEvents(browser) {
 
   await page.waitForTimeout(1000);
   let events = await page.evaluate(() =>
-    Array.from(document.querySelectorAll(".calendar-col"), (e) => {
+    Array.from(document.querySelectorAll(".list-view .calendar-col"), (e) => {
       return {
         title: e.querySelector(".name").textContent,
         link: e.querySelector("a").href,
@@ -25,6 +25,7 @@ async function getTragarnEvents(browser) {
 
     event.date = date;
   }
+  console.log(events);
 
   return events;
 }
