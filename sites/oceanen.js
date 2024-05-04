@@ -5,6 +5,7 @@ async function getOceanenEvents(browser) {
 
   let events = await page.evaluate(() =>
     Array.from(document.querySelectorAll(".upcoming-events li"), (e) => {
+      if (!e.querySelector("h3")?.textContent) return null;
       if (
         !e.querySelector("h3").textContent.includes("Studentradio") &&
         !e.querySelector("h3").textContent.includes("Standup")
