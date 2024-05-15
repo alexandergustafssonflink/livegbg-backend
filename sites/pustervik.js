@@ -21,7 +21,13 @@ async function getPustervikEvents(browser) {
   await page.waitForTimeout(1000);
   const events = await page.evaluate(() =>
     Array.from(document.querySelectorAll(".single.event"), (e) => {
-      if (!e.querySelector("h2").textContent.toLowerCase().includes("event")) {
+      if (
+        !e.querySelector("h2").textContent.toLowerCase().includes("event") &&
+        !e
+          .querySelector("h2")
+          .textContent.toLowerCase()
+          .includes("okategoriserad")
+      ) {
         const div = e.querySelector(".img-holder");
         const style = window.getComputedStyle(div, false);
         const image = style.backgroundImage.slice(4, -1).replace(/"/g, "");
