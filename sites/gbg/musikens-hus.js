@@ -26,6 +26,7 @@ async function getMusikensHusEvents(browser) {
             " " +
             e.querySelector(".cmscontent-date p").textContent,
           place: "Musikens hus",
+          city: "Göteborg",
         };
       }
     })

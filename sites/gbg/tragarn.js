@@ -12,6 +12,7 @@ async function getTragarnEvents(browser) {
         imageUrl: e.querySelector(".image img").src,
         date: e.querySelector(".date").textContent,
         place: "Trägårn",
+        city: "Göteborg",
       };
     })
   );

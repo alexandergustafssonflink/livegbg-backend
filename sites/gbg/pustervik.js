@@ -48,6 +48,7 @@ async function getPustervikEvents(browser) {
             .replace("\t\t\t\t", "")
             .replace("\t\t\t\t", ""),
           place: "Pustervik",
+          city: "Göteborg",
         };
       }
     })
