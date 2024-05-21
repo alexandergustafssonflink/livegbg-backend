@@ -17,6 +17,7 @@ async function getSkeppetEvents(browser) {
           imageUrl: e.querySelector("img").src,
           date: e.querySelector("time").getAttribute("datetime"),
           place: "Skeppet",
+          city: "Göteborg",
         };
       }
     )

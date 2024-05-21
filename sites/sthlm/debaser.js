@@ -1,28 +1,31 @@
-async function getOceanenEvents(browser) {
+async function getDebaserEvents(browser) {
   const page = await browser.newPage();
   page.setDefaultNavigationTimeout(0);
-  await page.goto("https://www.oceanen.com/");
+  await page.goto("https://www.debaser.se/kalender/", {
+    waitUntil: "networkidle2",
+  });
+  await page.waitForSelector(".event-image img");
 
   let events = await page.evaluate(() =>
-    Array.from(document.querySelectorAll(".upcoming-events li"), (e) => {
-      if (!e.querySelector("h3")?.textContent) return null;
-      if (
-        !e.querySelector("h3").textContent.includes("Studentradio") &&
-        !e.querySelector("h3").textContent.includes("Standup")
-      ) {
+    Array.from(document.querySelectorAll(".calendar-list a"), (e) => {
+      if (!e.querySelector("h4")?.textContent) return null;
+      if (!e.querySelector("h4").textContent.includes("Standup")) {
         const dateString = e
           .getElementsByTagName("time")[0]
           .getAttribute("datetime");
         // const year = dateString.split("-")[0]
         // const month = dateString.split("-")[1]
         // const day = dateString.split("-")[2].split(" ")[0]
+        const imageElement = e.querySelector(".event-image img");
+        const imageUrl = imageElement ? imageElement.src : null;
 
         return {
-          title: e.querySelector("h3").textContent,
-          link: e.querySelector("a").href,
-          imageUrl: e.getElementsByTagName("img")[0].getAttribute("data-src"),
+          title: e.querySelector("h4").textContent,
+          link: e.href,
+          imageUrl: imageUrl,
           date: dateString,
-          place: "Oceanen",
+          place: "Debaser",
+          city: "Stockholm",
         };
       }
     })
@@ -40,4 +43,4 @@ async function getOceanenEvents(browser) {
   return events;
 }
 
-module.exports = getOceanenEvents;
+module.exports = getDebaserEvents;

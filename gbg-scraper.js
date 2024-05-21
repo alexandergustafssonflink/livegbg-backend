@@ -8,19 +8,19 @@ const Artist = require("./models/artist");
 const { MongoClient } = require("mongodb");
 const schedule = require("node-schedule");
 const axios = require("axios");
-const getPustervikEvents = require("./sites/pustervik");
-const getOceanenEvents = require("./sites/oceanen");
-const getMusikensHusEvents = require("./sites/musikens-hus");
-const getNefertitiEvents = require("./sites/nefertiti");
-const getValandEvents = require("./sites/valand");
-const getTragarnEvents = require("./sites/tragarn");
-const getSkeppetEvents = require("./sites/skeppet");
+const getPustervikEvents = require("./sites/gbg/pustervik");
+const getOceanenEvents = require("./sites/gbg/oceanen");
+const getMusikensHusEvents = require("./sites/gbg/musikens-hus");
+const getNefertitiEvents = require("./sites/gbg/nefertiti");
+const getValandEvents = require("./sites/gbg/valand");
+const getTragarnEvents = require("./sites/gbg/tragarn");
+const getSkeppetEvents = require("./sites/gbg/skeppet");
 const checkAndGetArtistInfo = require("./utils/checkAndGetArtistInfo");
 const filterOutNonMusic = require("./utils/filterOutNonMusic");
 
 dotenv.config();
 
-async function getAllEvents() {
+async function getAllGbgEvents() {
   dotenv.config();
   mongoose.connect(process.env.DB_CONNECT, () =>
     console.log("CONNECTED TO DB")
@@ -73,6 +73,7 @@ async function getAllEvents() {
   const events = new Events({
     date: new Date(),
     events: allEvents,
+    city: "Göteborg",
   });
 
   try {
@@ -92,8 +93,8 @@ async function getAllEvents() {
 const job = schedule.scheduleJob("0 */4 * * *", function () {
   getAllEvents();
 });
-// getAllEvents();
+// getAllGbgEvents();
 // const job = schedule.scheduleJob("*/5 * * * *", function () {
 //   getAllEvents();
 // });
-module.exports.getAllEvents = getAllEvents;
+module.exports.getAllGbgEvents = getAllGbgEvents;

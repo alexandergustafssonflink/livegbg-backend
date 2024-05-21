@@ -21,6 +21,7 @@ async function getValandEvents(browser) {
             .replace(/(\r\n|\n|\r)/gm, "")
             .replace(",", ""),
           place: "Valand",
+          city: "Göteborg",
         };
       }
     })
