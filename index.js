@@ -19,6 +19,9 @@ app.use(function (req, res, next) {
     "https://livegbg.vercel.app",
     "https://www.livegbg.se",
     "https://livegbg.se",
+    "https://livesthlm.vercel.app",
+    "https://livesthlm.se",
+    "https://www.livesthlm.se",
   ];
   const origin = req.headers.origin;
   if (allowedOrigins.includes(origin)) {
