@@ -63,7 +63,7 @@ async function getAllSthlmEvents() {
 // const job = schedule.scheduleJob("0 */4 * * *", function () {
 //   getAllEvents();
 // });
-getAllSthlmEvents();
+// getAllSthlmEvents();
 // const job = schedule.scheduleJob("*/5 * * * *", function () {
 //   getAllEvents();
 // });
