@@ -92,7 +92,7 @@ async function getAllGbgEvents() {
 const job = schedule.scheduleJob("0 */4 * * *", function () {
   getAllGbgEvents();
 });
-// getAllGbgEvents();
+//getAllGbgEvents();
 // const job = schedule.scheduleJob("*/5 * * * *", function () {
 //   getAllEvents();
 // });
