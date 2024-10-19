@@ -31,12 +31,14 @@ async function getPustervikEvents(browser) {
         const div = e.querySelector(".img-holder");
         const style = window.getComputedStyle(div, false);
         const image = style.backgroundImage.slice(4, -1).replace(/"/g, "");
+        const allLinks = e.querySelectorAll("a");
+        const eventLink = allLinks.length >= 2 ? allLinks[1].href : ""; // Hämta den andra "a"-taggen om den finns
         return {
           title: e
             .querySelector("h2")
             .textContent.trim()
             .replace("konsert\n\t\t\t\t", ""),
-          link: e.querySelector(".more-button").href,
+          link: eventLink,
           tickets: e.querySelector("a.button.tickets")
             ? e.querySelector("a.button.tickets").href
             : "",

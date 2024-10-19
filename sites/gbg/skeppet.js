@@ -14,7 +14,9 @@ async function getSkeppetEvents(browser) {
             .textContent.replace("\n\t\t", "")
             .replace("\t", ""),
           link: e.querySelector("a").href,
-          imageUrl: e.querySelector("img").src,
+          imageUrl: e.querySelector("img")?.src
+            ? e.querySelector("img")?.src
+            : "",
           date: e.querySelector("time").getAttribute("datetime"),
           place: "Skeppet",
           city: "Göteborg",

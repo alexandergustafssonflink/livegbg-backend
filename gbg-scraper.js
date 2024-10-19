@@ -1,4 +1,3 @@
-// const puppeteer = require('puppeteer');
 const puppeteer = require("puppeteer-extra");
 const StealthPlugin = require("puppeteer-extra-plugin-stealth");
 const mongoose = require("mongoose");
@@ -91,9 +90,9 @@ async function getAllGbgEvents() {
 
 // test()
 const job = schedule.scheduleJob("0 */4 * * *", function () {
-  getAllEvents();
+  getAllGbgEvents();
 });
-// getAllGbgEvents();
+//getAllGbgEvents();
 // const job = schedule.scheduleJob("*/5 * * * *", function () {
 //   getAllEvents();
 // });
