@@ -4,6 +4,7 @@ const dotenv = require("dotenv");
 const mongoose = require("mongoose");
 const { MongoClient } = require("mongodb");
 const eventsRoute = require("./routes/events");
+const authRoute = require("./routes/auth");
 const artistRoute = require("./routes/artist");
 const proxyRoute = require("./routes/proxy");
 
@@ -16,6 +17,7 @@ mongoose.connect(process.env.DB_CONNECT, () => console.log("CONNECTED TO DB"));
 app.use(function (req, res, next) {
   const allowedOrigins = [
     "http://localhost:8080",
+    "http://localhost:8080/admin",
     "https://livegbg.vercel.app",
     "https://www.livegbg.se",
     "https://livegbg.se",
@@ -32,7 +34,7 @@ app.use(function (req, res, next) {
   // res.header("Access-Control-Allow-Origin", "https://fakturera-mera.vercel.app"); // update to match the domain you will make the request from
   res.header(
     "Access-Control-Allow-Headers",
-    "Origin, X-Requested-With, Content-Type, Accept, auth-token"
+    "Origin, X-Requested-With, Content-Type, Accept, Authorization"
   );
   res.header("Access-Control-Allow-Methods", "PUT, POST, GET, DELETE, OPTIONS");
   next();
@@ -42,6 +44,7 @@ app.use(express.json());
 
 app.use("/api/events", eventsRoute);
 app.use("/api/artist", artistRoute);
+app.use("/api/auth", authRoute);
 app.use("/api/proxy", proxyRoute);
 
 app.listen(process.env.PORT || 3000, () => console.log("Server is on!"));
