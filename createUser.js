@@ -44,4 +44,4 @@ async function createUser(email, password, place) {
 }
 
 // Anropa funktionen med din e-post, lösenord och plats
-createUser("alex1@test.com", "hejhej", "Jazzhuset");
+createUser("belsepub@icloud.com", "Aveny-Rockbaren645", "Rockbaren");
