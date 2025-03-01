@@ -1,9 +1,31 @@
 const router = require("express").Router();
+const dotenv = require("dotenv");
 const Events = require("../models/events.js");
 const ExternalEvents = require("../models/external-event.js");
 const authenticateToken = require("../middleware/auth.js");
+const express = require("express");
+const multer = require("multer");
+const cloudinary = require("cloudinary").v2;
+const fs = require("fs"); // För att ta bort lokala filer om du vill
+dotenv.config();
 
 const { getAllGbgEvents } = require("../gbg-scraper.js");
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "uploads/");
+  },
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + "-" + file.originalname);
+  },
+});
+const upload = multer({ storage });
 
 router.get("/getgbgevents", async (req, res) => {
   try {
@@ -61,34 +83,52 @@ router.get("/external", async (req, res) => {
   }
 });
 
-router.post("/external", authenticateToken, async (req, res) => {
-  try {
-    const { title, date, imageUrl, link, songs } = req.body;
+router.post(
+  "/external",
+  authenticateToken,
+  upload.single("image"),
+  async (req, res) => {
+    try {
+      const { title, date, link, songs } = req.body;
+      if (!req.user || !req.user.place) {
+        return res
+          .status(400)
+          .json({ message: "Användarens plats är inte definierad." });
+      }
 
-    // Kontrollera att vi har en autentiserad användare med ett `place`
-    if (!req.user || !req.user.place) {
-      return res
-        .status(400)
-        .json({ message: "Användarens plats är inte definierad." });
+      let imageUrl = "";
+      if (req.file) {
+        console.log("Filen mottagen:", req.file);
+        // Ladda upp filen till Cloudinary
+        const result = await cloudinary.uploader.upload(req.file.path, {
+          folder: "events",
+        });
+        console.log("Cloudinary-resultat:", result);
+        imageUrl = result.secure_url;
+        fs.unlink(req.file.path, (err) => {
+          if (err) console.error("Fel vid borttagning av lokala filen:", err);
+        });
+      }
+
+      const newEvent = new ExternalEvents({
+        title,
+        date,
+        imageUrl,
+        link,
+        songs,
+        place: req.user.place,
+      });
+
+      const savedEvent = await newEvent.save();
+      res.status(201).json(savedEvent);
+    } catch (error) {
+      console.error("Error vid skapande av event:", error);
+      res
+        .status(500)
+        .json({ message: "Kunde inte skapa eventet.", error: error.message });
     }
-
-    // Skapa ett nytt event med användarens `place`
-    const newEvent = new ExternalEvents({
-      title,
-      date,
-      imageUrl,
-      link,
-      songs,
-      place: req.user.place,
-    });
-
-    // Spara eventet i databasen
-    const savedEvent = await newEvent.save();
-    res.status(201).json(savedEvent);
-  } catch (error) {
-    res.status(500).json({ message: "Kunde inte skapa eventet.", error });
   }
-});
+);
 
 router.delete("/external/:id", authenticateToken, async (req, res) => {
   try {

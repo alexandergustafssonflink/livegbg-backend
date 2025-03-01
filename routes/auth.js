@@ -8,9 +8,12 @@ const router = express.Router();
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
 
+  console.log(req);
+
   try {
     // Kontrollera om användaren finns
     const user = await User.findOne({ email });
+    console.log("USER", user);
     if (!user) {
       return res.status(400).json({ message: "Fel e-post eller lösenord." });
     }
