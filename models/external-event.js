@@ -19,15 +19,36 @@ const externalEventSchema = new mongoose.Schema({
   },
   link: {
     type: String,
-    required: true,
+  },
+  eventInfo: {
+    type: String,
+  },
+  eventPrice: {
+    type: String,
+  },
+  ticketLink: {
+    type: String,
   },
   songs: {
     type: Array,
   },
 });
 
+externalEventSchema.pre("validate", function (next) {
+  if (!this.link) {
+    if (!this.eventInfo || !this.eventPrice) {
+      return next(
+        new Error(
+          "Antingen måste 'link' skickas med, eller så måste 'eventInfo', 'eventPrice' och 'ticketLink' fyllas i."
+        )
+      );
+    }
+  }
+  next();
+});
+
 module.exports = mongoose.model(
-  "External events",
+  "ExternalEvent",
   externalEventSchema,
   "external-events"
 );
