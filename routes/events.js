@@ -89,7 +89,8 @@ router.post(
   upload.single("image"),
   async (req, res) => {
     try {
-      const { title, date, link, songs } = req.body;
+      const { title, date, link, songs, eventInfo, eventPrice, ticketLink } =
+        req.body;
       if (!req.user || !req.user.place) {
         return res
           .status(400)
@@ -110,15 +111,24 @@ router.post(
         });
       }
 
-      const newEvent = new ExternalEvents({
+      // Bygg event-data beroende på om en länk skickas med eller inte
+      const eventData = {
         title,
         date,
         imageUrl,
-        link,
         songs,
         place: req.user.place,
-      });
+      };
 
+      if (link && link.trim() !== "") {
+        eventData.link = link;
+      } else {
+        eventData.eventInfo = eventInfo;
+        eventData.eventPrice = eventPrice;
+        eventData.ticketLink = ticketLink;
+      }
+
+      const newEvent = new ExternalEvents(eventData);
       const savedEvent = await newEvent.save();
       res.status(201).json(savedEvent);
     } catch (error) {
