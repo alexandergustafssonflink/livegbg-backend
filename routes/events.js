@@ -53,6 +53,9 @@ router.get("/gbg", async (req, res) => {
         date: externalEvent.date,
         place: externalEvent.place,
         city: externalEvent.city,
+        eventInfo: externalEvent.eventInfo,
+        eventPrice: externalEvent.eventPrice,
+        ticketLink: externalEvent.ticketLink,
       });
     });
 
