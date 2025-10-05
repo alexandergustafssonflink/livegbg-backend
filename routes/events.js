@@ -103,7 +103,6 @@ router.post(
       let imageUrl = "";
       if (req.file) {
         console.log("Filen mottagen:", req.file);
-        // Ladda upp filen till Cloudinary
         const result = await cloudinary.uploader.upload(req.file.path, {
           folder: "events",
         });
@@ -114,7 +113,6 @@ router.post(
         });
       }
 
-      // Bygg event-data beroende på om en länk skickas med eller inte
       const eventData = {
         title,
         date,
@@ -147,29 +145,24 @@ router.delete("/external/:id", authenticateToken, async (req, res) => {
   try {
     const eventId = req.params.id;
 
-    // Kontrollera att vi har en autentiserad användare med ett `place`
     if (!req.user || !req.user.place) {
       return res
         .status(400)
         .json({ message: "Användarens plats är inte definierad." });
     }
 
-    // Hitta eventet baserat på ID
     const event = await ExternalEvents.findById(eventId);
 
-    // Om eventet inte hittas
     if (!event) {
       return res.status(404).json({ message: "Eventet hittades inte." });
     }
 
-    // Kontrollera om användarens `place` är samma som eventets `place`
     if (event.place !== req.user.place) {
       return res
         .status(403)
         .json({ message: "Du har inte behörighet att ta bort detta event." });
     }
 
-    // Radera eventet
     await event.remove();
     res.status(200).json({ message: "Eventet har raderats." });
   } catch (error) {
