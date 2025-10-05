@@ -16,7 +16,7 @@ const userSchema = new mongoose.Schema({
     required: false,
   },
   roles: {
-    type: [String], // T.ex., ["poster"], om du vill kunna tilldela olika roller
+    type: [String],
     default: ["user"],
   },
   createdAt: {
