@@ -4,6 +4,7 @@ function filterOutNonMusic(events) {
       !event.title.toLowerCase().includes("wrestl") &&
       !event.title.toLowerCase().includes("forskare") &&
       !event.title.toLowerCase().includes("danscentrum") &&
+      !event.title.toLowerCase().includes("mässa") &&
       !event.title.toLowerCase().includes("poesi")
   );
   return filtered;
