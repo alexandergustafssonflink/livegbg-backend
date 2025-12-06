@@ -10,7 +10,7 @@ async function getSkeppetEvents(browser) {
       (e) => {
         return {
           title: e
-            .querySelector("h3 a")
+            .querySelector("h4 a")
             .textContent.replace("\n\t\t", "")
             .replace("\t", ""),
           link: e.querySelector("a").href,
