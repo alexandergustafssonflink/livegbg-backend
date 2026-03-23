@@ -17,10 +17,14 @@ async function getOceanenEvents(browser) {
         // const month = dateString.split("-")[1]
         // const day = dateString.split("-")[2].split(" ")[0]
 
+        const img = e.getElementsByTagName("img")[0];
         return {
           title: e.querySelector("h3").textContent,
           link: e.querySelector("a").href,
-          imageUrl: e.getElementsByTagName("img")[0].getAttribute("data-src"),
+          imageUrl:
+            img.getAttribute("data-src") ||
+            img.getAttribute("src") ||
+            img.src,
           date: dateString,
           place: "Oceanen",
           city: "Göteborg",
