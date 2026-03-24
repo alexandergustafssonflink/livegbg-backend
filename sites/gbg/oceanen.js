@@ -2,6 +2,7 @@ async function getOceanenEvents(browser) {
   const page = await browser.newPage();
   page.setDefaultNavigationTimeout(0);
   await page.goto("https://www.oceanen.com/");
+  await page.waitForTimeout(2000);
 
   let events = await page.evaluate(() =>
     Array.from(document.querySelectorAll(".upcoming-events li"), (e) => {
