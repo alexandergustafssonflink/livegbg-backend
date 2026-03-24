@@ -15,7 +15,7 @@ const getValandEvents = require("./sites/gbg/valand");
 const getTragarnEvents = require("./sites/gbg/tragarn");
 const getSkeppetEvents = require("./sites/gbg/skeppet");
 const getPotatisenEvents = require("./sites/gbg/potatisen");
-const checkAndGetArtistInfo = require("./utils/checkAndGetArtistInfo");
+// const checkAndGetArtistInfo = require("./utils/checkAndGetArtistInfo");
 const filterOutNonMusic = require("./utils/filterOutNonMusic");
 
 dotenv.config();
@@ -70,8 +70,8 @@ async function getAllGbgEvents() {
   console.log("FILTERING OUT NON MUSIC EVENTS");
   allEvents = filterOutNonMusic(allEvents);
 
-  console.log("CHECKING AND GETTING ARTIST INFO");
-  await checkAndGetArtistInfo(allEvents);
+  // console.log("CHECKING AND GETTING ARTIST INFO");
+  // await checkAndGetArtistInfo(allEvents);
 
   console.log("CREATING EVENTS");
   const events = new Events({
