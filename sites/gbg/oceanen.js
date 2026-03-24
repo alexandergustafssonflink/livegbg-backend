@@ -2,6 +2,7 @@ async function getOceanenEvents(browser) {
   const page = await browser.newPage();
   page.setDefaultNavigationTimeout(0);
   await page.goto("https://www.oceanen.com/");
+  await page.waitForTimeout(2000);
 
   let events = await page.evaluate(() =>
     Array.from(document.querySelectorAll(".upcoming-events li"), (e) => {
@@ -17,10 +18,14 @@ async function getOceanenEvents(browser) {
         // const month = dateString.split("-")[1]
         // const day = dateString.split("-")[2].split(" ")[0]
 
+        const img = e.getElementsByTagName("img")[0];
         return {
           title: e.querySelector("h3").textContent,
           link: e.querySelector("a").href,
-          imageUrl: e.getElementsByTagName("img")[0].getAttribute("data-src"),
+          imageUrl:
+            img.getAttribute("data-src") ||
+            img.getAttribute("src") ||
+            img.src,
           date: dateString,
           place: "Oceanen",
           city: "Göteborg",

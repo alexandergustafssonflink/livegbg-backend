@@ -9,36 +9,24 @@ async function getPotatisenEvents(browser) {
 
   let events = await page.evaluate(() =>
     Array.from(
-      document.querySelectorAll(
-        '[data-hook="event-list-item"], .event-item, article.event, .event'
-      ),
+      document.querySelectorAll(".animation-item"),
       (e) => {
-        const titleEl =
-          e.querySelector('[data-hook="ev-title"]') ||
-          e.querySelector("h2") ||
-          e.querySelector("h3");
-        const dateEl =
-          e.querySelector('[data-hook="ev-scheduled-buttons-rsvp-full"]') ||
-          e.querySelector("time") ||
-          e.querySelector(".date") ||
-          e.querySelector(".event-date");
-        const imgEl = e.querySelector("img");
-        const linkEl = e.querySelector("a");
+        const h3s = e.querySelectorAll("h3");
+        if (h3s.length < 3) return null;
 
-        if (!titleEl) return null;
+        const title = h3s[0].textContent.trim();
+        const category = h3s[1].textContent.trim();
+        const dateText = h3s[2].textContent.trim();
 
-        const title = titleEl.textContent.trim();
         if (
-          title.toLowerCase().includes("standup") ||
-          title.toLowerCase().includes("stand up") ||
-          title.toLowerCase().includes("karaoke")
+          !category.toLowerCase().includes("koncert") &&
+          !category.toLowerCase().includes("konsert")
         ) {
           return null;
         }
 
-        const dateText = dateEl
-          ? dateEl.getAttribute("datetime") || dateEl.textContent.trim()
-          : "";
+        const imgEl = e.querySelector("img");
+        const linkEl = e.querySelector("a");
 
         return {
           title: title,
@@ -52,50 +40,48 @@ async function getPotatisenEvents(browser) {
     )
   );
 
-  events = events.filter((event) => event !== null && event.date !== "");
+  events = events.filter((event) => event !== null);
+
+  const monthMap = {
+    "jan.": 1,
+    "feb.": 2,
+    "mars": 3,
+    "mar.": 3,
+    "apr.": 4,
+    "maj": 5,
+    "juni": 6,
+    "juli": 7,
+    "aug.": 8,
+    "sep.": 9,
+    "okt.": 10,
+    "nov.": 11,
+    "dec.": 12,
+  };
 
   let year = new Date().getFullYear();
+  const eventYears = [];
 
   for (let i = 0; i < events.length; i++) {
-    const isIsoDate = /^\d{4}-\d{2}-\d{2}/.test(events[i].date);
-    if (isIsoDate) {
-      const parts = events[i].date.split("T")[0].split("-");
-      events[i].date = new Date(
-        Date.UTC(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]))
-      );
-    } else {
-      if (
-        (events[i].date.toLowerCase().includes("jan") &&
-          events[i - 1]?.date.toLowerCase().includes("dec")) ||
-        (events[i].date.toLowerCase().includes("feb") &&
-          events[i - 1]?.date.toLowerCase().includes("dec")) ||
-        (events[i].date.toLowerCase().includes("mar") &&
-          events[i - 1]?.date.toLowerCase().includes("dec")) ||
-        (events[i].date.toLowerCase().includes("apr") &&
-          events[i - 1]?.date.toLowerCase().includes("dec"))
-      ) {
-        year++;
-      }
-      let dateString = (year + " " + events[i].date)
-        .replace("januari", "01")
-        .replace("februari", "02")
-        .replace("mars", "03")
-        .replace("april", "04")
-        .replace("maj", "05")
-        .replace("juni", "06")
-        .replace("juli", "07")
-        .replace("augusti", "08")
-        .replace("september", "09")
-        .replace("oktober", "10")
-        .replace("november", "11")
-        .replace("december", "12");
-      events[i].date = new Date(
-        Date.UTC(
-          dateString.split(" ")[0],
-          dateString.split(" ")[2] - 1,
-          dateString.split(" ")[1]
-        )
-      );
+    const parts = events[i].date.split(" ");
+    const month = monthMap[(parts[1] || "").toLowerCase()];
+    const prevMonth =
+      i > 0
+        ? monthMap[(events[i - 1].date.split(" ")[1] || "").toLowerCase()]
+        : null;
+
+    if (i > 0 && month <= 4 && prevMonth >= 11) {
+      year++;
+    }
+    eventYears.push(year);
+  }
+
+  for (let i = 0; i < events.length; i++) {
+    const parts = events[i].date.split(" ");
+    const day = Number(parts[0]);
+    const month = monthMap[(parts[1] || "").toLowerCase()];
+
+    if (day && month) {
+      events[i].date = new Date(Date.UTC(eventYears[i], month - 1, day));
     }
   }
 
