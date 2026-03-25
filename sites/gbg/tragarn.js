@@ -9,7 +9,27 @@ async function getTragarnEvents(browser) {
       return {
         title: e.querySelector(".name").textContent,
         link: e.querySelector("a").href,
-        imageUrl: e.querySelector(".image img").src,
+        imageUrl: (() => {
+          const img = e.querySelector(".image img");
+          let url = img.getAttribute("data-src") || img.src;
+          // Parse srcset to find the highest-resolution image available
+          const srcset = img.getAttribute("srcset");
+          if (srcset) {
+            let maxWidth = 0;
+            for (const source of srcset.split(",").map((s) => s.trim()).filter(Boolean)) {
+              const parts = source.split(/\s+/);
+              if (parts.length >= 2) {
+                const width = parseInt(parts[1]); // parts[1] is e.g. "1024w"
+                if (!isNaN(width) && width > maxWidth) {
+                  maxWidth = width;
+                  url = parts[0];
+                }
+              }
+            }
+          }
+          // Strip WordPress size suffix (e.g., -300x200.jpg → .jpg) to get full-size original
+          return url.replace(/-\d+x\d+(\.\w+)$/, "$1");
+        })(),
         date: e.querySelector(".date").textContent,
         place: "Trägårn",
         city: "Göteborg",
