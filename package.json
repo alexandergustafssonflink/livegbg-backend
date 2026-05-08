@@ -20,6 +20,8 @@
     "mongoose": "^6.5.2",
     "multer": "^1.4.5-lts.1",
     "node-schedule": "^2.1.0",
+    "passport": "^0.7.0",
+    "passport-google-oauth20": "^2.0.0",
     "puppeteer": "^16.2.0",
     "puppeteer-extra": "^3.3.4",
     "puppeteer-extra-plugin-stealth": "^2.11.1",

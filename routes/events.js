@@ -49,7 +49,8 @@ router.get("/gbg", async (req, res) => {
         place: 1,
         city: 1,
         tickets: 1,
-        _id: 0,
+        genre: 1,
+        highlighted: 1,
       }
     )
       .sort({ date: 1 })
@@ -61,6 +62,7 @@ router.get("/gbg", async (req, res) => {
     const merged = [...concerts];
     externalEvents.forEach((externalEvent) => {
       merged.push({
+        _id: externalEvent._id,
         title: externalEvent.title,
         link: externalEvent.link,
         imageUrl: externalEvent.imageUrl,
@@ -70,6 +72,9 @@ router.get("/gbg", async (req, res) => {
         eventInfo: externalEvent.eventInfo,
         eventPrice: externalEvent.eventPrice,
         ticketLink: externalEvent.ticketLink,
+        // External events kan inte favoritmarkeras än så länge - bara Concerts.
+        // Vi flaggar typen så frontend kan dölja favorit-knappen vid behov.
+        _isExternal: true,
       });
     });
 
@@ -84,6 +89,44 @@ router.get("/gbg", async (req, res) => {
     ]);
   } catch (error) {
     res.send(error);
+  }
+});
+
+/**
+ * GET /api/events/highlighted/:city
+ * Publik endpoint för karusellen - returnerar highlighted, aktiva,
+ * framtida konserter för angiven stad, sorterade på datum.
+ */
+router.get("/highlighted/:city", async (req, res) => {
+  try {
+    const { city } = req.params;
+    const todayStart = new Date();
+    todayStart.setUTCHours(0, 0, 0, 0);
+
+    const concerts = await Concert.find(
+      {
+        city,
+        highlighted: true,
+        isActive: true,
+        date: { $gte: todayStart },
+      },
+      {
+        title: 1,
+        link: 1,
+        imageUrl: 1,
+        date: 1,
+        place: 1,
+        city: 1,
+        tickets: 1,
+        genre: 1,
+      }
+    )
+      .sort({ date: 1 })
+      .lean();
+
+    res.json(concerts);
+  } catch (error) {
+    res.status(500).json({ message: "Kunde inte hämta highlighted events.", error: error.message });
   }
 });
 

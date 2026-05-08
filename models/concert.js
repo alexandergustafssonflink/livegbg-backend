@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const GENRES = require("../utils/genres");
 
 const concertSchema = new mongoose.Schema(
   {
@@ -9,6 +10,10 @@ const concertSchema = new mongoose.Schema(
     place: { type: String },
     tickets: { type: String },
     city: { type: String },
+
+    // Manuellt redigerbara fält (super-admin)
+    genre: { type: String, enum: [...GENRES, null], default: null },
+    highlighted: { type: Boolean, default: false },
 
     // Tracking-fält som låter scrapern uppdatera istället för att skapa nytt
     firstSeenAt: { type: Date, default: () => new Date() },
@@ -25,5 +30,7 @@ concertSchema.index({ place: 1, link: 1 });
 concertSchema.index({ place: 1, date: 1 });
 // Frontend-läsningar
 concertSchema.index({ city: 1, isActive: 1, date: 1 });
+// Karusell-feed: highlighted + framtida events
+concertSchema.index({ city: 1, highlighted: 1, isActive: 1, date: 1 });
 
 module.exports = mongoose.model("Concert", concertSchema, "concerts");
