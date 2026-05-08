@@ -1,11 +1,16 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
 const dotenv = require("dotenv");
-const User = require("./models/user"); // Anpassa sökvägen till din User-modell
+const User = require("./models/user");
 dotenv.config();
 
-async function createUser(email, password, place) {
-  dotenv.config();
+// CLI-script för att skapa privilegierade användare (organizer / super-admin).
+// Vanliga slutanvändare ska INTE skapas via det här scriptet - de registrerar
+// sig själva via /auth/register eller OAuth.
+// Anv:
+//   ROLES=super-admin EMAIL=du@example.se PASSWORD=hemligt node createUser.js
+//   ROLES=organizer EMAIL=foo@bar.se PASSWORD=hemligt PLACE=Pustervik node createUser.js
+async function createUser({ email, password, place, roles }) {
   console.log(process.env.DB_CONNECT);
   try {
     await mongoose.connect(process.env.DB_CONNECT, {
@@ -25,11 +30,16 @@ async function createUser(email, password, place) {
       email,
       password: hashedPassword,
       place,
-      roles: ["user"],
+      roles,
+      providers: [{ provider: "password", providerId: email }],
     });
 
     await newUser.save();
-    console.log("Användare skapad:", newUser);
+    console.log("Användare skapad:", {
+      email: newUser.email,
+      place: newUser.place,
+      roles: newUser.roles,
+    });
 
     await mongoose.disconnect();
   } catch (error) {
@@ -37,4 +47,12 @@ async function createUser(email, password, place) {
   }
 }
 
-createUser("scen@konstepidemin.se", "Konst-21A", "Konstepidemin");
+const email = process.env.EMAIL || "scen@konstepidemin.se";
+const password = process.env.PASSWORD || "Konst-21A";
+const place = process.env.PLACE || "Konstepidemin";
+const roles = (process.env.ROLES || "organizer")
+  .split(",")
+  .map((r) => r.trim())
+  .filter(Boolean);
+
+createUser({ email, password, place, roles });
