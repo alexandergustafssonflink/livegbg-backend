@@ -17,6 +17,7 @@ const getSkeppetEvents = require("./sites/gbg/skeppet");
 const getPotatisenEvents = require("./sites/gbg/potatisen");
 // const checkAndGetArtistInfo = require("./utils/checkAndGetArtistInfo");
 const filterOutNonMusic = require("./utils/filterOutNonMusic");
+const upsertConcerts = require("./utils/upsertConcerts");
 
 dotenv.config();
 
@@ -73,17 +74,12 @@ async function getAllGbgEvents() {
   // console.log("CHECKING AND GETTING ARTIST INFO");
   // await checkAndGetArtistInfo(allEvents);
 
-  console.log("CREATING EVENTS");
-  const events = new Events({
-    date: new Date(),
-    events: allEvents,
-    city: "Göteborg",
-  });
-
   try {
-    console.log("SAVING EVENTS");
-    const savedEvents = await events.save();
-    console.log("Done!");
+    console.log("UPSERTING CONCERTS");
+    const result = await upsertConcerts(allEvents, "Göteborg");
+    console.log(
+      `Done! Upserted ${result.upserted} concerts across ${result.venues} venues.`
+    );
   } catch (error) {
     console.log("PROBLEM");
     console.log(error);

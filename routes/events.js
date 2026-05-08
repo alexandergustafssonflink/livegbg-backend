@@ -1,6 +1,7 @@
 const router = require("express").Router();
 const dotenv = require("dotenv");
 const Events = require("../models/events.js");
+const Concert = require("../models/concert.js");
 const ExternalEvents = require("../models/external-event.js");
 const authenticateToken = require("../middleware/auth.js");
 const express = require("express");
@@ -38,15 +39,28 @@ router.get("/getgbgevents", async (req, res) => {
 
 router.get("/gbg", async (req, res) => {
   try {
-    const events = await Events.find({ city: "Göteborg" })
-      .sort({ _id: -1 })
-      .limit(1);
+    const concerts = await Concert.find(
+      { city: "Göteborg", isActive: true },
+      {
+        title: 1,
+        link: 1,
+        imageUrl: 1,
+        date: 1,
+        place: 1,
+        city: 1,
+        tickets: 1,
+        _id: 0,
+      }
+    )
+      .sort({ date: 1 })
+      .lean();
 
     const externalEvents = await ExternalEvents.find();
     console.log("EXTERNAL", externalEvents);
 
+    const merged = [...concerts];
     externalEvents.forEach((externalEvent) => {
-      events[0].events.push({
+      merged.push({
         title: externalEvent.title,
         link: externalEvent.link,
         imageUrl: externalEvent.imageUrl,
@@ -59,7 +73,15 @@ router.get("/gbg", async (req, res) => {
       });
     });
 
-    res.json(events);
+    // Behåll samma response-form som tidigare så frontend slipper ändras:
+    // en array med ett objekt som har `events`-arrayen i sig.
+    res.json([
+      {
+        city: "Göteborg",
+        date: new Date(),
+        events: merged,
+      },
+    ]);
   } catch (error) {
     res.send(error);
   }
