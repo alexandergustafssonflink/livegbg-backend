@@ -10,6 +10,7 @@ const artistRoute = require("./routes/artist");
 const proxyRoute = require("./routes/proxy");
 const adminRoute = require("./routes/admin");
 const favoritesRoute = require("./routes/favorites");
+const merchRoute = require("./routes/merch");
 
 dotenv.config();
 
@@ -65,5 +66,6 @@ app.use("/api/auth", authRoute);
 app.use("/api/proxy", proxyRoute);
 app.use("/api/admin", adminRoute);
 app.use("/api/favorites", favoritesRoute);
+app.use("/api/merch", merchRoute);
 
 app.listen(process.env.PORT || 3000, () => console.log("Server is on!"));
