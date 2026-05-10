@@ -18,6 +18,8 @@ const getPotatisenEvents = require("./sites/gbg/potatisen");
 // const checkAndGetArtistInfo = require("./utils/checkAndGetArtistInfo");
 const filterOutNonMusic = require("./utils/filterOutNonMusic");
 const upsertConcerts = require("./utils/upsertConcerts");
+const backfillPageContent = require("./utils/backfillPageContent");
+const backfillGenres = require("./utils/backfillGenres");
 
 dotenv.config();
 
@@ -80,6 +82,32 @@ async function getAllGbgEvents() {
     console.log(
       `Done! Upserted ${result.upserted} concerts across ${result.venues} venues.`
     );
+
+    // Hämta rå sid-text för nya/saknade events. Använder den GENERISKA
+    // extractor:n (utan per-venue-selektorer). Datan används i nästa steg
+    // av en LLM för att klassa genre och senare generera sammanfattning.
+    // Återanvänder samma browser, throttlar per venue.
+    console.log("BACKFILLING PAGE CONTENT");
+    const pcResult = await backfillPageContent(browser, {
+      limit: 30,
+      delayMs: 2500,
+    });
+    console.log(
+      `Page content backfill done: ${pcResult.fetched} fetched, ${pcResult.failed} failed.`
+    );
+
+    // Genre-klassning på det vi precis hämtade. Snabbt eftersom Anthropic
+    // API:t är mycket snabbare än Puppeteer-scraping. Skippas tyst om
+    // ANTHROPIC_API_KEY saknas (för utvecklingsmiljöer utan key).
+    if (process.env.ANTHROPIC_API_KEY) {
+      console.log("BACKFILLING GENRES");
+      const gResult = await backfillGenres({ limit: 50 });
+      console.log(
+        `Genre backfill done: ${gResult.classified} classified, ${gResult.failed} failed.`
+      );
+    } else {
+      console.log("Skipping genre backfill: ANTHROPIC_API_KEY not set.");
+    }
   } catch (error) {
     console.log("PROBLEM");
     console.log(error);
