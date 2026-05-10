@@ -1,10 +1,6 @@
 const Concert = require("../models/concert");
 const extractPageContent = require("./extractPageContent");
-
-// Venues vars event-länkar inte går att scrapa (t.ex. Facebook-events).
-// Dessa skippas i backfillen så vi inte slösar nätverkstrafik / timeout-tid.
-// Manuell genre-tagging via admin-UI får hantera dessa events.
-const SKIP_PLACES = ["Potatisen"];
+const SKIP_PLACES = require("./skipPlaces");
 
 /**
  * Hämta pageContent (rå sid-text) för aktiva, framtida concerts som saknar det.

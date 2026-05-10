@@ -10,6 +10,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.95.1",
     "axios": "^0.27.2",
     "bcrypt": "^5.1.1",
     "cloudinary": "^2.5.1",
@@ -22,11 +23,11 @@
     "node-schedule": "^2.1.0",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
-    "stripe": "^14.25.0",
     "puppeteer": "^16.2.0",
     "puppeteer-extra": "^3.3.4",
     "puppeteer-extra-plugin-stealth": "^2.11.1",
-    "request": "^2.88.2"
+    "request": "^2.88.2",
+    "stripe": "^14.25.0"
   },
   "devDependencies": {
     "nodemon": "^2.0.19"

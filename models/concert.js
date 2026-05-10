@@ -23,13 +23,25 @@ const concertSchema = new mongoose.Schema(
 
     // Råtext från event-sidan, hämtas av en GENERISK extractor (inga
     // per-venue-selektorer). Fungerar som input till LLM-pipelinen som
-    // ska klassa genre / generera sammanfattning.
+    // klassar genre / genererar sammanfattning.
     //
     // pageContentFetchedAt sätts vid lyckad hämtning, FailedAt vid miss
     // — backfillen retryar inte misslyckade på en vecka.
     pageContent: { type: String },
     pageContentFetchedAt: { type: Date },
     pageContentFetchFailedAt: { type: Date },
+
+    // Genre-klassning från Claude Haiku.
+    //   genreSource: 'ai' = automatisk klassning, 'admin' = manuellt satt
+    //     (admin-tagging override:as aldrig av AI:n).
+    //   genreConfidence: 0-1, AI:s egen säkerhet. Frontend visar bara genre
+    //     till inloggade användare och bara om confidence >= 0.7.
+    //   genrePromptVersion: tracks vilken prompt-version som producerade
+    //     tagningen — låter oss re-klassa allt när vi tweakar prompten.
+    genreConfidence: { type: Number, min: 0, max: 1 },
+    genreSource: { type: String, enum: ["ai", "admin", null], default: null },
+    genrePromptVersion: { type: String },
+    aiAnalyzedAt: { type: Date },
   },
   { timestamps: true }
 );
@@ -42,9 +54,9 @@ concertSchema.index({ place: 1, date: 1 });
 concertSchema.index({ city: 1, isActive: 1, date: 1 });
 // Karusell-feed: highlighted + framtida events
 concertSchema.index({ city: 1, highlighted: 1, isActive: 1, date: 1 });
-// Backfill-queue: hitta events som saknar description (DEPRECATED, se ovan)
-concertSchema.index({ description: 1, isActive: 1, date: 1 });
 // Backfill-queue för pageContent
 concertSchema.index({ pageContent: 1, isActive: 1, date: 1 });
+// Backfill-queue för genre-klassning (events med pageContent men ingen genre)
+concertSchema.index({ pageContent: 1, genre: 1, isActive: 1 });
 
 module.exports = mongoose.model("Concert", concertSchema, "concerts");

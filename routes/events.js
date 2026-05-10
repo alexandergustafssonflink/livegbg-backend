@@ -50,6 +50,8 @@ router.get("/gbg", async (req, res) => {
         city: 1,
         tickets: 1,
         genre: 1,
+        genreConfidence: 1,
+        genreSource: 1,
         highlighted: 1,
       }
     )
@@ -119,6 +121,8 @@ router.get("/highlighted/:city", async (req, res) => {
         city: 1,
         tickets: 1,
         genre: 1,
+        genreConfidence: 1,
+        genreSource: 1,
       }
     )
       .sort({ date: 1 })

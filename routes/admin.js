@@ -109,6 +109,21 @@ router.patch("/concerts/:id", async (req, res) => {
     }
     if (updates.genre === "") updates.genre = null;
 
+    // När admin sätter en genre manuellt, märk källan som 'admin' så
+    // AI-backfillen aldrig override:ar den. Om admin nollställer genre
+    // (väljer tomt i dropdown), nollas också source så event:et blir
+    // berättigat för AI-klassning igen.
+    if (Object.prototype.hasOwnProperty.call(updates, "genre")) {
+      if (updates.genre) {
+        updates.genreSource = "admin";
+      } else {
+        updates.genreSource = null;
+        updates.genreConfidence = null;
+        updates.aiAnalyzedAt = null;
+        updates.genrePromptVersion = null;
+      }
+    }
+
     const concert = await Concert.findByIdAndUpdate(
       req.params.id,
       { $set: updates },
