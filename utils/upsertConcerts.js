@@ -130,8 +130,13 @@ async function upsertConcerts(scrapedEvents, city) {
       existing.tickets = ev.tickets ?? existing.tickets;
       existing.city = ev.city || city || existing.city;
       existing.lastSeenAt = fetchTime;
-      existing.isActive = true;
-      existing.deactivatedAt = undefined;
+      // Återaktivera bara om eventet inte är permanent avaktiverat av AI:n
+      // (t.ex. teater/comedy som klassats som icke-livemusik). Annars skulle
+      // varje scrape återaktivera dessa events och göra LLM-arbetet meningslöst.
+      if (!existing.isNotLiveMusic) {
+        existing.isActive = true;
+        existing.deactivatedAt = undefined;
+      }
 
       await existing.save();
       seenIds.push(existing._id);
