@@ -18,6 +18,7 @@ const getPotatisenEvents = require("./sites/gbg/potatisen");
 // const checkAndGetArtistInfo = require("./utils/checkAndGetArtistInfo");
 const filterOutNonMusic = require("./utils/filterOutNonMusic");
 const upsertConcerts = require("./utils/upsertConcerts");
+const backfillPageContent = require("./utils/backfillPageContent");
 
 dotenv.config();
 
@@ -79,6 +80,19 @@ async function getAllGbgEvents() {
     const result = await upsertConcerts(allEvents, "Göteborg");
     console.log(
       `Done! Upserted ${result.upserted} concerts across ${result.venues} venues.`
+    );
+
+    // Hämta rå sid-text för nya/saknade events. Använder den GENERISKA
+    // extractor:n (utan per-venue-selektorer). Datan används i nästa steg
+    // av en LLM för att klassa genre och senare generera sammanfattning.
+    // Återanvänder samma browser, throttlar per venue.
+    console.log("BACKFILLING PAGE CONTENT");
+    const pcResult = await backfillPageContent(browser, {
+      limit: 30,
+      delayMs: 2500,
+    });
+    console.log(
+      `Page content backfill done: ${pcResult.fetched} fetched, ${pcResult.failed} failed.`
     );
   } catch (error) {
     console.log("PROBLEM");
