@@ -49,6 +49,9 @@ async function main() {
       promptVersion,
     });
     console.log("[backfill-genres] Done:", result);
+    console.log(
+      `  Klassificerad: ${result.classified}, Misslyckad: ${result.failed}, Inte livemusik: ${result.notLiveMusic}, Totalt processerat: ${result.total}`
+    );
   } catch (err) {
     console.error("[backfill-genres] Fatal error:", err);
     process.exitCode = 1;

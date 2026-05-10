@@ -8,6 +8,9 @@ const SKIP_PLACES = require("./skipPlaces");
  * Respekterar admin-tagging: events där genreSource === 'admin' skippas
  * alltid (admin har sista ordet).
  *
+ * Hoppar över events som misslyckades klassificeras nyligen (inom ~7 dagar)
+ * för att undvika onödig API-användning.
+ *
  * @param {object} [options]
  * @param {number} [options.limit=100] - max antal events per körning
  * @param {string[]} [options.places] - om angivet, bara dessa venues
@@ -16,7 +19,9 @@ const SKIP_PLACES = require("./skipPlaces");
  *                                            re-klassa bara events som tagged med
  *                                            denna äldre version (eller äldre)
  * @param {number} [options.delayMs=200] - delay mellan API-anrop (rate limit safety)
- * @returns {Promise<{ classified: number, failed: number, total: number }>}
+ * @param {number} [options.failureRetryDays=7] - försök inte klassificera events som
+ *                                                 misslyckades inom detta många dagar
+ * @returns {Promise<{ classified: number, failed: number, notLiveMusic: number, total: number }>}
  */
 async function backfillGenres(options = {}) {
   const {
@@ -25,10 +30,16 @@ async function backfillGenres(options = {}) {
     force = false,
     promptVersion = null,
     delayMs = 200,
+    failureRetryDays = 7,
   } = options;
 
   const todayStart = new Date();
   todayStart.setUTCHours(0, 0, 0, 0);
+
+  // Cutoff för retry: om klassificering misslyckades inom failureRetryDays,
+  // försök inte igen
+  const failureRetryDate = new Date();
+  failureRetryDate.setDate(failureRetryDate.getDate() - failureRetryDays);
 
   const query = {
     isActive: true,
@@ -36,6 +47,14 @@ async function backfillGenres(options = {}) {
     pageContent: { $exists: true, $nin: [null, ""] },
     // Admin-tagging override:as aldrig.
     genreSource: { $ne: "admin" },
+    // Hoppa över events som inte är livemusik
+    isNotLiveMusic: { $ne: true },
+    // Hoppa över events som misslyckades klassificering nyligen
+    $or: [
+      { genreClassificationFailedAt: { $exists: false } },
+      { genreClassificationFailedAt: null },
+      { genreClassificationFailedAt: { $lt: failureRetryDate } },
+    ],
     // Defense-in-depth: även om Potatisen aldrig skulle ha pageContent
     // (det filtreras i backfillPageContent), exkluderar vi explicit här
     // så ev. legacy-data inte kommer igenom.
@@ -76,10 +95,36 @@ async function backfillGenres(options = {}) {
 
   let classified = 0;
   let failed = 0;
+  let notLiveMusic = 0;
 
   for (const concert of candidates) {
     try {
       const result = await classifyGenre(concert);
+
+      // Om LLM bedömde att detta inte är livemusik, deaktivera det
+      if (result.isNotLiveMusic) {
+        await Concert.updateOne(
+          { _id: concert._id },
+          {
+            $set: {
+              isNotLiveMusic: true,
+              isActive: false,
+              deactivatedAt: new Date(),
+              genreSource: "ai",
+              genrePromptVersion: classifyGenre.PROMPT_VERSION,
+              aiAnalyzedAt: new Date(),
+            },
+          }
+        );
+        notLiveMusic++;
+        console.log(
+          `[backfill-genres] 🚫 ${concert.place} - ${concert.title} → inte livemusik, deaktiverad`
+        );
+        if (delayMs > 0) await sleep(delayMs);
+        continue;
+      }
+
+      // Framgångsrik klassificering
       await Concert.updateOne(
         { _id: concert._id },
         {
@@ -89,6 +134,8 @@ async function backfillGenres(options = {}) {
             genreSource: "ai",
             genrePromptVersion: classifyGenre.PROMPT_VERSION,
             aiAnalyzedAt: new Date(),
+            // Rensa tidigare klassificeringfel
+            genreClassificationFailedAt: null,
           },
         }
       );
@@ -105,6 +152,15 @@ async function backfillGenres(options = {}) {
       }
     } catch (err) {
       failed++;
+      // Märk klassificeringfel med timestamp så vi inte försöker igen snart
+      await Concert.updateOne(
+        { _id: concert._id },
+        {
+          $set: {
+            genreClassificationFailedAt: new Date(),
+          },
+        }
+      );
       console.warn(
         `[backfill-genres] ✗ ${concert.place} - ${concert.title}:`,
         err.message
@@ -114,7 +170,7 @@ async function backfillGenres(options = {}) {
     if (delayMs > 0) await sleep(delayMs);
   }
 
-  return { classified, failed, total: candidates.length };
+  return { classified, failed, notLiveMusic, total: candidates.length };
 }
 
 function sleep(ms) {

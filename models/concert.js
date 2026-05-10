@@ -42,6 +42,16 @@ const concertSchema = new mongoose.Schema(
     genreSource: { type: String, enum: ["ai", "admin", null], default: null },
     genrePromptVersion: { type: String },
     aiAnalyzedAt: { type: Date },
+
+    // Markering för klassificeringfel eller non-livemusic events.
+    //   isNotLiveMusic: true = LLM bedömde detta som inte livemusik
+    //     (t.ex. teater, komik, DJ-set utan genre-info). Event deaktiveras
+    //     och ska inte scrapas igen.
+    //   genreClassificationFailedAt: sätts när LLM-klassning misslyckades.
+    //     Backfill-jobbet retryar inte inom en vecka för att undvika
+    //     upprepad API-användning på events som är svåra att klassificera.
+    isNotLiveMusic: { type: Boolean, default: false },
+    genreClassificationFailedAt: { type: Date },
   },
   { timestamps: true }
 );
@@ -58,5 +68,9 @@ concertSchema.index({ city: 1, highlighted: 1, isActive: 1, date: 1 });
 concertSchema.index({ pageContent: 1, isActive: 1, date: 1 });
 // Backfill-queue för genre-klassning (events med pageContent men ingen genre)
 concertSchema.index({ pageContent: 1, genre: 1, isActive: 1 });
+// Backfill-queue för genre-klassning (exkludera recent failures)
+concertSchema.index({ genreClassificationFailedAt: 1, isActive: 1 });
+// Track non-livemusic events
+concertSchema.index({ isNotLiveMusic: 1, isActive: 1 });
 
 module.exports = mongoose.model("Concert", concertSchema, "concerts");

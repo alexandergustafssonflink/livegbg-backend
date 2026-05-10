@@ -23,6 +23,7 @@ Riktlinjer:
 - Om du måste härleda genre från kända artistnamn eller indirekta ledtrådar → medel confidence (0.5-0.8).
 - Om beskrivningen är för generisk eller tvetydig → låg confidence (0.0-0.5).
 - Returnera genre = null om ingen genre i listan passar (t.ex. komik, teater, DJ-set utan genre-info).
+- Om evenmanget INTE är livemusik alls (t.ex. teater, stand-up, föreläsning, DJ-set utan musiker), sätt isNotLiveMusic=true och genre=null.
 - Använd ALDRIG genrer utanför listan. Om en konsert är "indie-folk", välj antingen "indie" eller "folk" baserat på vad som dominerar.
 - Lämna alltid en kort reasoning (1-2 meningar) som motiverar valet.`;
 
@@ -46,13 +47,18 @@ const TOOL = {
         description:
           "Hur säker du är på klassningen, från 0 (helt osäker) till 1 (helt säker).",
       },
+      isNotLiveMusic: {
+        type: "boolean",
+        description:
+          "True om evenmanget INTE är livemusik (t.ex. teater, stand-up, föreläsning). Då sätts genre=null automatiskt.",
+      },
       reasoning: {
         type: "string",
         description:
           "Kort motivering (1-2 meningar) på svenska som förklarar varför just denna genre och confidence.",
       },
     },
-    required: ["genre", "confidence", "reasoning"],
+    required: ["genre", "confidence", "isNotLiveMusic", "reasoning"],
   },
 };
 
@@ -71,7 +77,7 @@ function getClient() {
  * Klassificerar en concert. Förutsätter att concert.pageContent finns.
  *
  * @param {object} concert - { title, place, pageContent, date? }
- * @returns {Promise<{ genre: string|null, confidence: number, reasoning: string }>}
+ * @returns {Promise<{ genre: string|null, confidence: number, isNotLiveMusic: boolean, reasoning: string }>}
  */
 async function classifyGenre(concert) {
   if (!concert || !concert.pageContent) {
@@ -105,7 +111,7 @@ async function classifyGenre(concert) {
     );
   }
 
-  const { genre, confidence, reasoning } = toolUse.input;
+  const { genre, confidence, isNotLiveMusic, reasoning } = toolUse.input;
 
   // Validera schema-output (Claude följer det nästan alltid, men paranoia)
   const validGenre = genre === null || GENRES.includes(genre);
@@ -117,8 +123,13 @@ async function classifyGenre(concert) {
       `classifyGenre: ogiltig confidence: ${confidence}`
     );
   }
+  if (typeof isNotLiveMusic !== "boolean") {
+    throw new Error(
+      `classifyGenre: isNotLiveMusic måste vara boolean, fick: ${typeof isNotLiveMusic}`
+    );
+  }
 
-  return { genre, confidence, reasoning: reasoning || "" };
+  return { genre, confidence, isNotLiveMusic: isNotLiveMusic || false, reasoning: reasoning || "" };
 }
 
 module.exports = classifyGenre;
