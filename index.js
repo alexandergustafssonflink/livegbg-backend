@@ -11,6 +11,8 @@ const proxyRoute = require("./routes/proxy");
 const adminRoute = require("./routes/admin");
 const favoritesRoute = require("./routes/favorites");
 const merchRoute = require("./routes/merch");
+const analyticsRoute = require("./routes/analytics");
+const { startAnalyticsCleanup } = require("./jobs/cleanupAnalytics");
 
 dotenv.config();
 
@@ -67,5 +69,9 @@ app.use("/api/proxy", proxyRoute);
 app.use("/api/admin", adminRoute);
 app.use("/api/favorites", favoritesRoute);
 app.use("/api/merch", merchRoute);
+app.use("/api/analytics", analyticsRoute);
+
+// Starta schemalagt jobb för GDPR-städning av analytics-data
+startAnalyticsCleanup();
 
 app.listen(process.env.PORT || 3000, () => console.log("Server is on!"));
