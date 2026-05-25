@@ -1,6 +1,6 @@
 const router = require("express").Router();
 const PageView = require("../models/pageView");
-const { hashVisitor } = require("../utils/ipHash");
+const { hashVisitor, hashVisitorMonthly } = require("../utils/ipHash");
 const authenticateToken = require("../middleware/auth");
 const requireRole = require("../middleware/requireRole");
 
@@ -39,6 +39,7 @@ router.post("/pageview", async (req, res) => {
       "0.0.0.0";
 
     const hashedVisitor = hashVisitor(rawIp);
+    const monthlyHash = hashVisitorMonthly(rawIp);
 
     const allowedDevices = ["mobile", "desktop", "unknown"];
     const cleanDevice = allowedDevices.includes(device) ? device : "unknown";
@@ -46,6 +47,7 @@ router.post("/pageview", async (req, res) => {
     await PageView.create({
       path: path.substring(0, 500),
       hashedVisitor,
+      monthlyHash,
       device: cleanDevice,
       timestamp: new Date(),
     });
@@ -122,6 +124,78 @@ router.get(
       return res.json(results);
     } catch (err) {
       console.error("[Analytics] GET /summary error:", err);
+      return res.status(500).json({ message: "Serverfel." });
+    }
+  }
+);
+
+/**
+ * GET /api/analytics/monthly-summary
+ *
+ * Kräver inloggning som super-admin.
+ * Returnerar månadsvis aggregering med EXAKTA unika besökare per månad,
+ * deduplicerade med månadssaltet (monthlyHash).
+ *
+ * Query-params:
+ *   from  YYYY-MM-DD
+ *   to    YYYY-MM-DD
+ *
+ * Response: [{ month: "2026-05", pageviews: 312, uniqueVisitors: 189 }, ...]
+ */
+router.get(
+  "/monthly-summary",
+  authenticateToken,
+  requireRole("super-admin"),
+  async (req, res) => {
+    try {
+      const { from, to } = req.query;
+
+      const fromDate = from
+        ? new Date(from + "T00:00:00.000Z")
+        : new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+
+      const toDate = to
+        ? new Date(to + "T23:59:59.999Z")
+        : new Date();
+
+      if (isNaN(fromDate) || isNaN(toDate)) {
+        return res.status(400).json({ message: "Ogiltigt datumformat." });
+      }
+
+      const results = await PageView.aggregate([
+        {
+          $match: {
+            timestamp: { $gte: fromDate, $lte: toDate },
+            monthlyHash: { $exists: true },
+          },
+        },
+        {
+          $group: {
+            _id: {
+              $dateToString: {
+                format: "%Y-%m",
+                date: "$timestamp",
+                timezone: "Europe/Stockholm",
+              },
+            },
+            pageviews: { $sum: 1 },
+            uniqueVisitors: { $addToSet: "$monthlyHash" },
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            month: "$_id",
+            pageviews: 1,
+            uniqueVisitors: { $size: "$uniqueVisitors" },
+          },
+        },
+        { $sort: { month: 1 } },
+      ]);
+
+      return res.json(results);
+    } catch (err) {
+      console.error("[Analytics] GET /monthly-summary error:", err);
       return res.status(500).json({ message: "Serverfel." });
     }
   }
