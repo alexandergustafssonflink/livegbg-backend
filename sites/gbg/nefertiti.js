@@ -29,7 +29,7 @@ async function getNefertitiEvents(browser) {
             link: e.querySelector(".readmore").href,
             imageUrl: e.getElementsByTagName("img")[0].src,
             date: e.querySelector(".timestamp.heading").textContent,
-            place: "Nefertiti",
+            venue: "Nefertiti",
             city: "Göteborg",
           };
         }

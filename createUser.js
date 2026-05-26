@@ -9,8 +9,8 @@ dotenv.config();
 // sig själva via /auth/register eller OAuth.
 // Anv:
 //   ROLES=super-admin EMAIL=du@example.se PASSWORD=hemligt node createUser.js
-//   ROLES=organizer EMAIL=foo@bar.se PASSWORD=hemligt PLACE=Pustervik node createUser.js
-async function createUser({ email, password, place, roles }) {
+//   ROLES=organizer EMAIL=foo@bar.se PASSWORD=hemligt VENUE=Pustervik node createUser.js
+async function createUser({ email, password, venue, roles }) {
   console.log(process.env.DB_CONNECT);
   try {
     await mongoose.connect(process.env.DB_CONNECT, {
@@ -29,7 +29,7 @@ async function createUser({ email, password, place, roles }) {
     const newUser = new User({
       email,
       password: hashedPassword,
-      place,
+      venue,
       roles,
       providers: [{ provider: "password", providerId: email }],
     });
@@ -37,7 +37,7 @@ async function createUser({ email, password, place, roles }) {
     await newUser.save();
     console.log("Användare skapad:", {
       email: newUser.email,
-      place: newUser.place,
+      venue: newUser.venue,
       roles: newUser.roles,
     });
 
@@ -49,10 +49,10 @@ async function createUser({ email, password, place, roles }) {
 
 const email = process.env.EMAIL || "scen@konstepidemin.se";
 const password = process.env.PASSWORD || "Konst-21A";
-const place = process.env.PLACE || "Konstepidemin";
+const venue = process.env.VENUE || "Konstepidemin";
 const roles = (process.env.ROLES || "organizer")
   .split(",")
   .map((r) => r.trim())
   .filter(Boolean);
 
-createUser({ email, password, place, roles });
+createUser({ email, password, venue, roles });

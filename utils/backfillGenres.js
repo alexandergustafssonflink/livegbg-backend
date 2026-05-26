@@ -1,6 +1,6 @@
 const Concert = require("../models/concert");
 const classifyGenre = require("./classifyGenre");
-const SKIP_PLACES = require("./skipPlaces");
+const SKIP_PLACES = require("./skipVenues");
 
 /**
  * Klassificera genre på concerts som har pageContent men ingen AI-genre än.
@@ -13,7 +13,7 @@ const SKIP_PLACES = require("./skipPlaces");
  *
  * @param {object} [options]
  * @param {number} [options.limit=100] - max antal events per körning
- * @param {string[]} [options.places] - om angivet, bara dessa venues
+ * @param {string[]} [options.venues] - om angivet, bara dessa venues
  * @param {boolean} [options.force=false] - re-klassa även events som redan har AI-genre
  * @param {string} [options.promptVersion] - om angivet tillsammans med force,
  *                                            re-klassa bara events som tagged med
@@ -26,7 +26,7 @@ const SKIP_PLACES = require("./skipPlaces");
 async function backfillGenres(options = {}) {
   const {
     limit = 100,
-    places = null,
+    venues = null,
     force = false,
     promptVersion = null,
     delayMs = 200,
@@ -58,7 +58,7 @@ async function backfillGenres(options = {}) {
     // Defense-in-depth: även om Potatisen aldrig skulle ha pageContent
     // (det filtreras i backfillPageContent), exkluderar vi explicit här
     // så ev. legacy-data inte kommer igenom.
-    place: { $nin: SKIP_PLACES },
+    venue: { $nin: SKIP_PLACES },
   };
 
   if (!force) {
@@ -81,7 +81,7 @@ async function backfillGenres(options = {}) {
   // FORCE utan PROMPT_VERSION: re-klassa allt (utom admin-taggade och
   // SKIP_PLACES). Använd försiktigt — kostar API-anrop på allt.
 
-  if (places && places.length) query.place = { $in: places };
+  if (venues && venues.length) query.venue = { $in: venues };
 
   const candidates = await Concert.find(query)
     .sort({ date: 1 })
@@ -118,7 +118,7 @@ async function backfillGenres(options = {}) {
         );
         notLiveMusic++;
         console.log(
-          `[backfill-genres] 🚫 ${concert.place} - ${concert.title} → inte livemusik, deaktiverad`
+          `[backfill-genres] 🚫 ${concert.venue} - ${concert.title} → inte livemusik, deaktiverad`
         );
         if (delayMs > 0) await sleep(delayMs);
         continue;
@@ -144,7 +144,7 @@ async function backfillGenres(options = {}) {
       const conf = (result.confidence * 100).toFixed(0);
       const symbol = result.confidence >= 0.7 ? "✓" : "?";
       console.log(
-        `[backfill-genres] ${symbol} ${concert.place} - ${concert.title} → ${result.genre || "null"} (${conf}%)`
+        `[backfill-genres] ${symbol} ${concert.venue} - ${concert.title} → ${result.genre || "null"} (${conf}%)`
       );
       // Logga reasoning för låga-confidence-fall så vi kan tweaka prompt:en
       if (result.confidence < 0.7) {
@@ -162,7 +162,7 @@ async function backfillGenres(options = {}) {
         }
       );
       console.warn(
-        `[backfill-genres] ✗ ${concert.place} - ${concert.title}:`,
+        `[backfill-genres] ✗ ${concert.venue} - ${concert.title}:`,
         err.message
       );
     }

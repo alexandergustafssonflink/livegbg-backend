@@ -4,6 +4,8 @@ const Events = require("../models/events.js");
 const Concert = require("../models/concert.js");
 const ExternalEvents = require("../models/external-event.js");
 const authenticateToken = require("../middleware/auth.js");
+const requireRole = require("../middleware/requireRole.js");
+const GENRES = require("../utils/genres.js");
 const express = require("express");
 const multer = require("multer");
 const cloudinary = require("cloudinary").v2;
@@ -28,6 +30,16 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
+/**
+ * GET /api/events/genres
+ * Publik lista över giltiga genrer. Används av admin-UI (både super-admin
+ * och organizer) för att populera dropdown:s, och bör hållas i synk med
+ * Concert/ExternalEvent-modellernas enum (via samma utils/genres-fil).
+ */
+router.get("/genres", (req, res) => {
+  res.json(GENRES);
+});
+
 router.get("/getgbgevents", async (req, res) => {
   try {
     await getAllEvents();
@@ -46,7 +58,7 @@ router.get("/gbg", async (req, res) => {
         link: 1,
         imageUrl: 1,
         date: 1,
-        place: 1,
+        venue: 1,
         city: 1,
         tickets: 1,
         genre: 1,
@@ -69,11 +81,16 @@ router.get("/gbg", async (req, res) => {
         link: externalEvent.link,
         imageUrl: externalEvent.imageUrl,
         date: externalEvent.date,
-        place: externalEvent.place,
+        venue: externalEvent.venue,
         city: externalEvent.city,
         eventInfo: externalEvent.eventInfo,
         eventPrice: externalEvent.eventPrice,
         ticketLink: externalEvent.ticketLink,
+        genre: externalEvent.genre,
+        // External events har manuellt satta genrer (ingen AI-klassning),
+        // så vi flaggar källan som 'admin' så shouldShowGenre släpper igenom
+        // dem utan att kolla confidence.
+        genreSource: externalEvent.genre ? "admin" : null,
         // External events kan inte favoritmarkeras än så länge - bara Concerts.
         // Vi flaggar typen så frontend kan dölja favorit-knappen vid behov.
         _isExternal: true,
@@ -117,7 +134,7 @@ router.get("/highlighted/:city", async (req, res) => {
         link: 1,
         imageUrl: 1,
         date: 1,
-        place: 1,
+        venue: 1,
         city: 1,
         tickets: 1,
         genre: 1,
@@ -155,18 +172,77 @@ router.get("/external", async (req, res) => {
   }
 });
 
+// Whitelist över fält en organizer får ändra på sina egna external events
+// via PATCH. Allt annat (t.ex. venue eller _id) är låst.
+const EXTERNAL_EDITABLE_FIELDS = [
+  "title",
+  "date",
+  "link",
+  "eventInfo",
+  "eventPrice",
+  "ticketLink",
+  "genre",
+];
+
+/**
+ * Returnerar ett normaliserat genre-värde eller kastar Error om värdet
+ * inte är tillåtet. Tomt/null betyder "ingen genre satt" - inte ett fel.
+ */
+function validateGenre(value) {
+  if (value === undefined || value === null || value === "") return null;
+  if (typeof value !== "string" || !GENRES.includes(value)) {
+    const err = new Error(
+      `Ogiltig genre '${value}'. Tillåtna värden: ${GENRES.join(", ")}`
+    );
+    err.statusCode = 400;
+    throw err;
+  }
+  return value;
+}
+
+/**
+ * Säkerställer att en URL har ett protokoll. Användare skriver ofta
+ * `www.hej.se` utan https:// - utan protokoll tolkar browsern det som en
+ * relativ path och rendrerar `livegbg.com/admin/www.hej.se`.
+ */
+function normalizeLink(value) {
+  if (typeof value !== "string") return value;
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  // mailto:/tel: och liknande - lämna orörda
+  if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
 router.post(
   "/external",
   authenticateToken,
+  requireRole("organizer"),
   upload.single("image"),
   async (req, res) => {
     try {
-      const { title, date, link, songs, eventInfo, eventPrice, ticketLink } =
-        req.body;
-      if (!req.user || !req.user.place) {
+      const {
+        title,
+        date,
+        link,
+        songs,
+        eventInfo,
+        eventPrice,
+        ticketLink,
+        genre,
+      } = req.body;
+      if (!req.user || !req.user.venue) {
         return res
           .status(400)
-          .json({ message: "Användarens plats är inte definierad." });
+          .json({ message: "Din användare saknar en venue. Kontakta admin." });
+      }
+
+      let normalizedGenre;
+      try {
+        normalizedGenre = validateGenre(genre);
+      } catch (err) {
+        return res.status(400).json({ message: err.message });
       }
 
       let imageUrl = "";
@@ -187,15 +263,16 @@ router.post(
         date,
         imageUrl,
         songs,
-        place: req.user.place,
+        venue: req.user.venue,
+        genre: normalizedGenre,
       };
 
       if (link && link.trim() !== "") {
-        eventData.link = link;
+        eventData.link = normalizeLink(link);
       } else {
         eventData.eventInfo = eventInfo;
         eventData.eventPrice = eventPrice;
-        eventData.ticketLink = ticketLink;
+        eventData.ticketLink = normalizeLink(ticketLink);
       }
 
       const newEvent = new ExternalEvents(eventData);
@@ -210,52 +287,178 @@ router.post(
   }
 );
 
-router.delete("/external/:id", authenticateToken, async (req, res) => {
-  try {
-    const eventId = req.params.id;
+/**
+ * PATCH /api/events/external/:id
+ * Uppdatera ett av sina egna external events. Whitelist över tillåtna fält.
+ * Bild kan uppdateras genom att skicka ny `image`-fil.
+ */
+router.patch(
+  "/external/:id",
+  authenticateToken,
+  requireRole("organizer"),
+  upload.single("image"),
+  async (req, res) => {
+    try {
+      if (!req.user || !req.user.venue) {
+        return res
+          .status(400)
+          .json({ message: "Din användare saknar en venue. Kontakta admin." });
+      }
 
-    if (!req.user || !req.user.place) {
-      return res
-        .status(400)
-        .json({ message: "Användarens plats är inte definierad." });
+      const event = await ExternalEvents.findById(req.params.id);
+      if (!event) {
+        return res.status(404).json({ message: "Eventet hittades inte." });
+      }
+
+      // Organizer får bara röra events kopplade till sin egen venue
+      if (event.venue !== req.user.venue) {
+        return res.status(403).json({
+          message: "Du har inte behörighet att redigera detta event.",
+        });
+      }
+
+      const updates = {};
+      for (const field of EXTERNAL_EDITABLE_FIELDS) {
+        if (Object.prototype.hasOwnProperty.call(req.body, field)) {
+          updates[field] = req.body[field];
+        }
+      }
+
+      // Validera genre mot enum:n (samma lista som Concert använder).
+      // genre: null/empty är ett giltigt värde ("ingen genre satt") - inte
+      // ett fel - så vi sparar det som null snarare än att unset:a.
+      if (Object.prototype.hasOwnProperty.call(updates, "genre")) {
+        try {
+          updates.genre = validateGenre(updates.genre);
+        } catch (err) {
+          return res.status(400).json({ message: err.message });
+        }
+      }
+
+      // Ny bild laddas upp till Cloudinary och ersätter den gamla URL:en
+      if (req.file) {
+        const result = await cloudinary.uploader.upload(req.file.path, {
+          folder: "events",
+        });
+        updates.imageUrl = result.secure_url;
+        fs.unlink(req.file.path, (err) => {
+          if (err) console.error("Fel vid borttagning av lokala filen:", err);
+        });
+      }
+
+      // Normalisera URL-fält så de inte tolkas som relativa paths av browsern
+      if (Object.prototype.hasOwnProperty.call(updates, "ticketLink")) {
+        updates.ticketLink = normalizeLink(updates.ticketLink);
+      }
+
+      // Om link sätts ska info-fälten tömmas (och vice versa), så vi inte
+      // hamnar i ett inkonsekvent tillstånd.
+      if (Object.prototype.hasOwnProperty.call(updates, "link")) {
+        if (updates.link && updates.link.trim() !== "") {
+          updates.link = normalizeLink(updates.link);
+          updates.eventInfo = "";
+          updates.eventPrice = "";
+          updates.ticketLink = "";
+        }
+        // else: link skickades som tom string - lämna kvar för nästa loop
+        // som omvandlar det till $unset
+      }
+
+      // Bygg om updates till $set/$unset så vi kan TA BORT fält när
+      // användaren skickar tom string. $set: { link: undefined } är en
+      // no-op i Mongoose - vi måste explicit $unset för att rensa.
+      // Genre hanteras separat eftersom null är ett giltigt sparat värde.
+      const $set = {};
+      const $unset = {};
+      for (const [k, v] of Object.entries(updates)) {
+        if (k === "genre") {
+          $set.genre = v;
+          continue;
+        }
+        if (v === undefined || v === null || v === "") {
+          $unset[k] = "";
+        } else {
+          $set[k] = v;
+        }
+      }
+      const updateOp = {};
+      if (Object.keys($set).length) updateOp.$set = $set;
+      if (Object.keys($unset).length) updateOp.$unset = $unset;
+
+      const updated = await ExternalEvents.findByIdAndUpdate(
+        req.params.id,
+        updateOp,
+        { new: true, runValidators: true }
+      );
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error vid uppdatering av event:", error);
+      res.status(500).json({
+        message: "Kunde inte uppdatera eventet.",
+        error: error.message,
+      });
     }
-
-    const event = await ExternalEvents.findById(eventId);
-
-    if (!event) {
-      return res.status(404).json({ message: "Eventet hittades inte." });
-    }
-
-    if (event.place !== req.user.place) {
-      return res
-        .status(403)
-        .json({ message: "Du har inte behörighet att ta bort detta event." });
-    }
-
-    await event.remove();
-    res.status(200).json({ message: "Eventet har raderats." });
-  } catch (error) {
-    res.status(500).json({ message: "Kunde inte radera eventet.", error });
   }
-});
+);
 
-router.get("/external/my-events", authenticateToken, async (req, res) => {
-  console.log("GETTING MY EVENTS");
-  try {
-    // Kontrollera att vi har en autentiserad användare med ett `place`
-    if (!req.user || !req.user.place) {
-      return res
-        .status(400)
-        .json({ message: "Användarens plats är inte definierad." });
+router.delete(
+  "/external/:id",
+  authenticateToken,
+  requireRole("organizer"),
+  async (req, res) => {
+    try {
+      if (!req.user || !req.user.venue) {
+        return res
+          .status(400)
+          .json({ message: "Din användare saknar en venue. Kontakta admin." });
+      }
+
+      const event = await ExternalEvents.findById(req.params.id);
+      if (!event) {
+        return res.status(404).json({ message: "Eventet hittades inte." });
+      }
+
+      if (event.venue !== req.user.venue) {
+        return res.status(403).json({
+          message: "Du har inte behörighet att ta bort detta event.",
+        });
+      }
+
+      // .remove() är borttaget i Mongoose 7+ — använd deleteOne på dokumentet
+      await event.deleteOne();
+      res.status(200).json({ message: "Eventet har raderats." });
+    } catch (error) {
+      res
+        .status(500)
+        .json({ message: "Kunde inte radera eventet.", error: error.message });
     }
-
-    const events = await ExternalEvents.find({ place: req.user.place }).sort({
-      _id: -1,
-    });
-    res.json(events);
-  } catch (error) {
-    res.status(500).json({ message: "Kunde inte skapa eventet.", error });
   }
-});
+);
+
+router.get(
+  "/external/my-events",
+  authenticateToken,
+  requireRole("organizer"),
+  async (req, res) => {
+    try {
+      if (!req.user || !req.user.venue) {
+        return res
+          .status(400)
+          .json({ message: "Din användare saknar en venue. Kontakta admin." });
+      }
+
+      const events = await ExternalEvents.find({
+        venue: req.user.venue,
+      }).sort({ _id: -1 });
+      res.json(events);
+    } catch (error) {
+      res.status(500).json({
+        message: "Kunde inte hämta dina events.",
+        error: error.message,
+      });
+    }
+  }
+);
 
 module.exports = router;

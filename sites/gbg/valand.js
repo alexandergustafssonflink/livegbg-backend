@@ -30,7 +30,7 @@ async function getValandEvents(browser) {
             link: linkEl?.href || null,
             imageUrl: image,
             dateText: dateText.replace(/(\r\n|\n|\r)/gm, "").trim(),
-            place: "Valand",
+            venue: "Valand",
             city: "Göteborg",
           };
         })
@@ -165,7 +165,7 @@ async function getValandEvents(browser) {
             link: evt.link,
             imageUrl: evt.imageUrl,
             date: d, // Date (UTC)
-            place: evt.place,
+            venue: evt.venue,
             city: evt.city,
           });
         }

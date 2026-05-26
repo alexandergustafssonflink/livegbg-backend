@@ -18,7 +18,7 @@ async function getSkeppetEvents(browser) {
             ? e.querySelector("img")?.src
             : "",
           date: e.querySelector("time").getAttribute("datetime"),
-          place: "Skeppet",
+          venue: "Skeppet",
           city: "Göteborg",
         };
       }

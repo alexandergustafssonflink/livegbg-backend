@@ -22,7 +22,7 @@ router.get("/genres", (req, res) => {
  * GET /api/admin/concerts
  * Lista konserter för admin-vyn. Stöd för filter via query-string:
  *   ?city=Göteborg
- *   ?search=Linkin              (matchning mot title/place, case-insensitive)
+ *   ?search=Linkin              (matchning mot title/venue, case-insensitive)
  *   ?includeInactive=true       (default: false)
  *   ?includePast=true           (default: false - bara framtida events)
  *   ?limit=200&skip=0           (paginering)
@@ -53,7 +53,7 @@ router.get("/concerts", async (req, res) => {
       const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       query.$or = [
         { title: { $regex: escaped, $options: "i" } },
-        { place: { $regex: escaped, $options: "i" } },
+        { venue: { $regex: escaped, $options: "i" } },
       ];
     }
 
@@ -73,7 +73,7 @@ router.get("/concerts", async (req, res) => {
 /**
  * PATCH /api/admin/concerts/:id
  * Uppdatera fält på en konsert. Endast vissa fält tillåts (whitelist).
- * Body: { genre?, highlighted?, isActive?, title?, place?, date?, link?, imageUrl?, tickets? }
+ * Body: { genre?, highlighted?, isActive?, title?, venue?, date?, link?, imageUrl?, tickets? }
  */
 router.patch("/concerts/:id", async (req, res) => {
   try {
@@ -82,7 +82,7 @@ router.patch("/concerts/:id", async (req, res) => {
       "highlighted",
       "isActive",
       "title",
-      "place",
+      "venue",
       "date",
       "link",
       "imageUrl",
@@ -179,11 +179,23 @@ router.get("/users", async (req, res) => {
 
 /**
  * PATCH /api/admin/users/:id
- * Uppdatera en användares roller och/eller venue (place).
- * Body: { roles?: ["organizer"|"super-admin"|"user"], place?: string|null }
+ * Uppdatera en användares roller och/eller venue.
+ * Body: { roles?: ["organizer"|"super-admin"|"user"], venue?: string|null }
+ *
+ * Regler:
+ *   - Vi tillåter inte att den inloggade super-adminen demoterar sig själv.
+ *   - Om slut-tillståndet inkluderar rollen "organizer" måste venue vara satt
+ *     (annars går det inte att binda events till någon lokal).
+ *   - venue normaliseras alltid till trim+lowercase för robust matchning
+ *     mot ExternalEvent.venue.
  */
 router.patch("/users/:id", async (req, res) => {
   try {
+    const existing = await User.findById(req.params.id);
+    if (!existing) {
+      return res.status(404).json({ message: "Användaren hittades inte." });
+    }
+
     const updates = {};
 
     if (Array.isArray(req.body.roles)) {
@@ -198,8 +210,17 @@ router.patch("/users/:id", async (req, res) => {
       updates.roles = [...new Set(cleaned)]; // dedupe
     }
 
-    if (Object.prototype.hasOwnProperty.call(req.body, "place")) {
-      updates.place = req.body.place || undefined;
+    let venueProvided = false;
+    if (Object.prototype.hasOwnProperty.call(req.body, "venue")) {
+      venueProvided = true;
+      const raw = req.body.venue;
+      // Normalisera redan här eftersom Mongoose-setters (lowercase/trim) inte
+      // garanterat körs på findByIdAndUpdate i alla versioner.
+      const normalized =
+        typeof raw === "string" && raw.trim()
+          ? raw.trim().toLowerCase()
+          : undefined;
+      updates.venue = normalized;
     }
 
     // Förhindra att en super-admin demoterar sig själv av misstag
@@ -210,6 +231,15 @@ router.patch("/users/:id", async (req, res) => {
     ) {
       return res.status(400).json({
         message: "Du kan inte ta bort din egen super-admin-roll.",
+      });
+    }
+
+    // Validera slut-tillståndet: organizer-rollen kräver en venue
+    const finalRoles = updates.roles ?? existing.roles ?? [];
+    const finalVenue = venueProvided ? updates.venue : existing.venue;
+    if (finalRoles.includes("organizer") && !finalVenue) {
+      return res.status(400).json({
+        message: "Organizer-rollen kräver en venue.",
       });
     }
 

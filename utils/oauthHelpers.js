@@ -52,13 +52,16 @@ async function findOrCreateOAuthUser({
 
 /**
  * Skapar en signerad JWT-token för en user.
+ *
+ * Token innehåller endast identitet (userId + name). Roller och venue
+ * hämtas alltid från /api/auth/me för att undvika stale-data när en
+ * super-admin uppdaterar någons roll - frontend ska kunna se nya
+ * behörigheter efter en page reload istället för att kräva re-login.
  */
 function signToken(user) {
   return jwt.sign(
     {
       userId: user._id,
-      place: user.place,
-      roles: user.roles || [],
       name: user.name,
     },
     process.env.JWT_SECRET,

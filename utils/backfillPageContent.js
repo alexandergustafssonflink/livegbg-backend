@@ -1,6 +1,6 @@
 const Concert = require("../models/concert");
 const extractPageContent = require("./extractPageContent");
-const SKIP_PLACES = require("./skipPlaces");
+const SKIP_PLACES = require("./skipVenues");
 
 /**
  * Hämta pageContent (rå sid-text) för aktiva, framtida concerts som saknar det.
@@ -14,7 +14,7 @@ const SKIP_PLACES = require("./skipPlaces");
  * @param {object} [options]
  * @param {number} [options.limit=50] - max antal events per körning
  * @param {number} [options.delayMs=2500] - delay mellan requests inom samma venue
- * @param {string[]} [options.places] - om angivet, bara dessa venues
+ * @param {string[]} [options.venues] - om angivet, bara dessa venues
  * @param {number} [options.retryAfterDays=7] - dagar att vänta innan retry av miss
  * @param {boolean} [options.onePerVenue=false] - hämta bara EN concert per venue
  * @param {boolean} [options.force=false] - ignorera befintligt pageContent och hämta om
@@ -24,7 +24,7 @@ async function backfillPageContent(browser, options = {}) {
   const {
     limit = 50,
     delayMs = 2500,
-    places = null,
+    venues = null,
     retryAfterDays = 7,
     onePerVenue = false,
     force = false,
@@ -40,7 +40,7 @@ async function backfillPageContent(browser, options = {}) {
     isActive: true,
     date: { $gte: todayStart },
     link: { $exists: true, $ne: "" },
-    place: { $nin: SKIP_PLACES },
+    venue: { $nin: SKIP_PLACES },
   };
   if (!force) {
     query.pageContent = { $in: [null, undefined, ""] };
@@ -50,14 +50,14 @@ async function backfillPageContent(browser, options = {}) {
       { pageContentFetchFailedAt: { $lt: retryCutoff } },
     ];
   }
-  if (places && places.length) query.place = { $in: places };
+  if (venues && venues.length) query.venue = { $in: venues };
 
   let candidates;
   if (onePerVenue) {
     const grouped = await Concert.aggregate([
       { $match: query },
       { $sort: { date: 1 } },
-      { $group: { _id: "$place", doc: { $first: "$$ROOT" } } },
+      { $group: { _id: "$venue", doc: { $first: "$$ROOT" } } },
       { $replaceRoot: { newRoot: "$doc" } },
       { $limit: limit },
     ]);
@@ -78,15 +78,15 @@ async function backfillPageContent(browser, options = {}) {
   let failed = 0;
 
   // Gruppera per venue så vi kan throttla per-venue (inte över hela)
-  const byPlace = new Map();
+  const byVenue = new Map();
   for (const c of candidates) {
-    if (!byPlace.has(c.place)) byPlace.set(c.place, []);
-    byPlace.get(c.place).push(c);
+    if (!byVenue.has(c.venue)) byVenue.set(c.venue, []);
+    byVenue.get(c.venue).push(c);
   }
 
   // Kör venues parallellt, throttla inom varje venue
-  const venuePromises = Array.from(byPlace.entries()).map(
-    async ([place, concerts]) => {
+  const venuePromises = Array.from(byVenue.entries()).map(
+    async ([venue, concerts]) => {
       for (const concert of concerts) {
         try {
           const pageContent = await extractPageContent(browser, concert.link);
@@ -103,7 +103,7 @@ async function backfillPageContent(browser, options = {}) {
             );
             fetched++;
             console.log(
-              `[backfill-pageContent] ✓ ${place} - ${concert.title} (${pageContent.length} chars)`
+              `[backfill-pageContent] ✓ ${venue} - ${concert.title} (${pageContent.length} chars)`
             );
           } else {
             await Concert.updateOne(
@@ -112,7 +112,7 @@ async function backfillPageContent(browser, options = {}) {
             );
             failed++;
             console.log(
-              `[backfill-pageContent] ✗ ${place} - ${concert.title} (no/too short content)`
+              `[backfill-pageContent] ✗ ${venue} - ${concert.title} (no/too short content)`
             );
           }
         } catch (err) {
@@ -122,7 +122,7 @@ async function backfillPageContent(browser, options = {}) {
           );
           failed++;
           console.warn(
-            `[backfill-pageContent] ✗ ${place} - ${concert.title}:`,
+            `[backfill-pageContent] ✗ ${venue} - ${concert.title}:`,
             err.message
           );
         }

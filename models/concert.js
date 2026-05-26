@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const GENRES = require("../utils/genres");
+const dualVenueField = require("../utils/dualVenueField");
 
 const concertSchema = new mongoose.Schema(
   {
@@ -7,7 +8,7 @@ const concertSchema = new mongoose.Schema(
     link: { type: String },
     imageUrl: { type: String },
     date: { type: Date },
-    place: { type: String },
+    venue: { type: String },
     tickets: { type: String },
     city: { type: String },
 
@@ -57,9 +58,9 @@ const concertSchema = new mongoose.Schema(
 );
 
 // Snabb upsert-matchning via link inom en venue (primär matchningsnyckel)
-concertSchema.index({ place: 1, link: 1 });
+concertSchema.index({ venue: 1, link: 1 });
 // Fallback-matchning via venue + datum
-concertSchema.index({ place: 1, date: 1 });
+concertSchema.index({ venue: 1, date: 1 });
 // Frontend-läsningar
 concertSchema.index({ city: 1, isActive: 1, date: 1 });
 // Karusell-feed: highlighted + framtida events
@@ -72,5 +73,13 @@ concertSchema.index({ pageContent: 1, genre: 1, isActive: 1 });
 concertSchema.index({ genreClassificationFailedAt: 1, isActive: 1 });
 // Track non-livemusic events
 concertSchema.index({ isNotLiveMusic: 1, isActive: 1 });
+
+// Bakåtkompatibel läsning under övergångsperioden från place→venue.
+// OBS: Concert.venue lowercaseas INTE av pluginen för Concert-dokument
+// eftersom det är scrapad display-data ("Pustervik", inte "pustervik").
+// Eftersom Concert-schemat inte har lowercase: true på venue-fältet
+// behåller pluginen sin case-insensitive matchning för bakåtkomp men
+// rör inte stored values.
+concertSchema.plugin(dualVenueField);
 
 module.exports = mongoose.model("Concert", concertSchema, "concerts");

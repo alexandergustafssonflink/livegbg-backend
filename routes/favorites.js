@@ -17,7 +17,7 @@ router.get("/", async (req, res) => {
       .populate({
         path: "concertId",
         select:
-          "title link imageUrl date place city tickets genre highlighted isActive",
+          "title link imageUrl date venue city tickets genre highlighted isActive",
       })
       .lean();
 

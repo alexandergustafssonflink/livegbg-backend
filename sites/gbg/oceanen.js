@@ -27,7 +27,7 @@ async function getOceanenEvents(browser) {
             img.getAttribute("src") ||
             img.src,
           date: dateString,
-          place: "Oceanen",
+          venue: "Oceanen",
           city: "Göteborg",
         };
       }

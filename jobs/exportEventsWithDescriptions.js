@@ -7,7 +7,7 @@
  * Användning:
  *   node jobs/exportEventsWithDescriptions.js
  *   CITY=Göteborg node jobs/exportEventsWithDescriptions.js
- *   PLACES=Pustervik,Oceanen node jobs/exportEventsWithDescriptions.js
+ *   VENUES=Pustervik,Oceanen node jobs/exportEventsWithDescriptions.js
  *   ONE_PER_VENUE=1 node jobs/exportEventsWithDescriptions.js
  *   LIMIT=25 node jobs/exportEventsWithDescriptions.js
  *   OUTPUT=./descriptions.json node jobs/exportEventsWithDescriptions.js
@@ -25,8 +25,8 @@ dotenv.config({ path: rootEnvPath });
 async function main() {
   const limit = Number(process.env.LIMIT || 0);
   const city = process.env.CITY;
-  const places = process.env.PLACES
-    ? process.env.PLACES.split(",").map((p) => p.trim()).filter(Boolean)
+  const venues = process.env.VENUES
+    ? process.env.VENUES.split(",").map((p) => p.trim()).filter(Boolean)
     : null;
   const onePerVenue =
     process.env.ONE_PER_VENUE === "1" || process.env.ONE_PER_VENUE === "true";
@@ -47,12 +47,12 @@ async function main() {
   };
 
   if (city) query.city = city;
-  if (places && places.length) query.place = { $in: places };
+  if (venues && venues.length) query.venue = { $in: venues };
 
   const projection = {
     _id: 0,
     title: 1,
-    place: 1,
+    venue: 1,
     date: 1,
     link: 1,
     pageContent: 1,
@@ -66,10 +66,10 @@ async function main() {
     events = await Concert.aggregate([
       { $match: query },
       { $sort: { pageContentFetchedAt: -1, date: 1 } },
-      { $group: { _id: "$place", doc: { $first: "$$ROOT" } } },
+      { $group: { _id: "$venue", doc: { $first: "$$ROOT" } } },
       { $replaceRoot: { newRoot: "$doc" } },
       { $project: projection },
-      { $sort: { place: 1 } },
+      { $sort: { venue: 1 } },
       ...(limit > 0 ? [{ $limit: limit }] : []),
     ]);
   } else {
@@ -90,7 +90,7 @@ async function main() {
     const dateStr = event.date
       ? new Date(event.date).toISOString().slice(0, 10)
       : "";
-    const meta = [event.place, dateStr].filter(Boolean).join(" · ");
+    const meta = [event.venue, dateStr].filter(Boolean).join(" · ");
     const title = event.title || "(utan titel)";
     return `${index + 1}. ${title}${meta ? `  [${meta}]` : ""}`;
   };

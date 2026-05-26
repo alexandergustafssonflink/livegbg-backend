@@ -6,7 +6,7 @@
  * Användning:
  *   node jobs/backfillPageContent.js
  *   LIMIT=20 node jobs/backfillPageContent.js                  # max 20 events
- *   PLACES=Pustervik,Oceanen node jobs/backfillPageContent.js  # bara dessa venues
+ *   VENUES=Pustervik,Oceanen node jobs/backfillPageContent.js  # bara dessa venues
  *   DELAY=4000 node jobs/backfillPageContent.js                # 4s mellan requests
  *   ONE_PER_VENUE=1 node jobs/backfillPageContent.js           # en konsert per venue
  *   FORCE=1 node jobs/backfillPageContent.js                   # re-fetcha även befintliga
@@ -28,8 +28,8 @@ dotenv.config({ path: path.join(__dirname, "..", ".env") });
 async function main() {
   const limit = Number(process.env.LIMIT || 50);
   const delayMs = Number(process.env.DELAY || 2500);
-  const places = process.env.PLACES
-    ? process.env.PLACES.split(",").map((p) => p.trim()).filter(Boolean)
+  const venues = process.env.VENUES
+    ? process.env.VENUES.split(",").map((p) => p.trim()).filter(Boolean)
     : null;
   const onePerVenue =
     process.env.ONE_PER_VENUE === "1" || process.env.ONE_PER_VENUE === "true";
@@ -52,7 +52,7 @@ async function main() {
     const result = await backfillPageContent(browser, {
       limit,
       delayMs,
-      places,
+      venues,
       onePerVenue,
       force,
     });
