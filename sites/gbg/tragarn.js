@@ -31,7 +31,7 @@ async function getTragarnEvents(browser) {
           return url.replace(/-\d+x\d+(\.\w+)$/, "$1");
         })(),
         date: e.querySelector(".date").textContent,
-        place: "Trägårn",
+        venue: "Trägårn",
         city: "Göteborg",
       };
     })

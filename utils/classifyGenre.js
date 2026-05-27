@@ -76,7 +76,7 @@ function getClient() {
 /**
  * Klassificerar en concert. Förutsätter att concert.pageContent finns.
  *
- * @param {object} concert - { title, place, pageContent, date? }
+ * @param {object} concert - { title, venue, pageContent, date? }
  * @returns {Promise<{ genre: string|null, confidence: number, isNotLiveMusic: boolean, reasoning: string }>}
  */
 async function classifyGenre(concert) {
@@ -87,7 +87,7 @@ async function classifyGenre(concert) {
   const truncated = concert.pageContent.slice(0, MAX_INPUT_CHARS);
   const userMessage = [
     `Titel: ${concert.title || "(okänd)"}`,
-    `Venue: ${concert.place || "(okänd)"}`,
+    `Venue: ${concert.venue || "(okänd)"}`,
     "",
     "Sidans innehåll:",
     truncated,

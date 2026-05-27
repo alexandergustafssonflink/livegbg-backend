@@ -4,7 +4,7 @@
  * Användning:
  *   node jobs/backfillGenres.js
  *   LIMIT=50 node jobs/backfillGenres.js                  # max 50 events
- *   PLACES=Pustervik,Oceanen node jobs/backfillGenres.js  # bara dessa venues
+ *   VENUES=Pustervik,Oceanen node jobs/backfillGenres.js  # bara dessa venues
  *   FORCE=1 node jobs/backfillGenres.js                   # re-klassa även AI-taggade
  *                                                          (admin-taggade skyddas alltid)
  *   FORCE=1 PROMPT_VERSION=1 node jobs/backfillGenres.js  # re-klassa bara events
@@ -21,8 +21,8 @@ dotenv.config({ path: path.join(__dirname, "..", ".env") });
 async function main() {
   const limit = Number(process.env.LIMIT || 100);
   const delayMs = Number(process.env.DELAY || 200);
-  const places = process.env.PLACES
-    ? process.env.PLACES.split(",").map((p) => p.trim()).filter(Boolean)
+  const venues = process.env.VENUES
+    ? process.env.VENUES.split(",").map((p) => p.trim()).filter(Boolean)
     : null;
   const force = process.env.FORCE === "1" || process.env.FORCE === "true";
   const promptVersion = process.env.PROMPT_VERSION || null;
@@ -44,7 +44,7 @@ async function main() {
     const result = await backfillGenres({
       limit,
       delayMs,
-      places,
+      venues,
       force,
       promptVersion,
     });

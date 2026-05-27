@@ -25,7 +25,7 @@ async function getMusikensHusEvents(browser) {
             e.querySelector(".cmscontent-date h4").textContent +
             " " +
             e.querySelector(".cmscontent-date p").textContent,
-          place: "Musikens hus",
+          venue: "Musikens hus",
           city: "Göteborg",
         };
       }

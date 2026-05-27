@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const dualVenueField = require("../utils/dualVenueField");
 
 // En provider-koppling: t.ex. { provider: "google", providerId: "1234..." }
 // En user kan ha flera (samma email kan ha både password och google-providern).
@@ -36,10 +37,14 @@ const userSchema = new mongoose.Schema({
     type: [providerSchema],
     default: [],
   },
-  // Venue/plats för organizers. Tom för vanliga användare.
-  place: {
+  // Venue för organizers. Tom för vanliga användare och super-admins.
+  // Normaliseras till trimmad lowercase så ExternalEvent.venue-matchningen
+  // är robust mot olika skiftläge ("Pustervik" vs "pustervik").
+  venue: {
     type: String,
     required: false,
+    trim: true,
+    lowercase: true,
   },
   // Roller: "user" (default), "organizer", "super-admin"
   roles: {
@@ -54,5 +59,10 @@ const userSchema = new mongoose.Schema({
 
 // Snabb lookup på provider+providerId vid OAuth-callback
 userSchema.index({ "providers.provider": 1, "providers.providerId": 1 });
+
+// Bakåtkompatibel läsning under övergångsperioden från place→venue.
+// Tas bort när jobs/renamePlaceToVenue.js har körts mot prod och inga
+// dokument längre har `place`-fältet.
+userSchema.plugin(dualVenueField);
 
 module.exports = mongoose.model("User", userSchema, "users");

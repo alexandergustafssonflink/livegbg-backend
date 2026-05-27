@@ -5,12 +5,12 @@ const Concert = require("../models/concert");
  * eller uppdaterar befintliga baserat på en stabil matchningsnyckel.
  *
  * Matchningsstrategi (i prioritetsordning):
- *   1. place + link  - URL:en är typiskt stabil även om titeln ändras
+ *   1. venue + link  - URL:en är typiskt stabil även om titeln ändras
  *      (t.ex. "Linkin park" -> "Linkin park + Soundgarden")
- *   2. place + samma datum - en venue har sällan flera events samma dag,
+ *   2. venue + samma datum - en venue har sällan flera events samma dag,
  *      MEN vi använder den här fallbacken bara när det är otvetydigt:
- *        - scrapen får inte ha flera events på samma place+date
- *        - DB:n får inte ha flera kandidater på samma place+date
+ *        - scrapen får inte ha flera events på samma venue+date
+ *        - DB:n får inte ha flera kandidater på samma venue+date
  *        - titeln måste dela något ord med kandidatens titel (eller vara
  *          substring), så ett helt nytt event på samma dag inte krockar
  *
@@ -31,10 +31,10 @@ function dayBoundsUtc(date) {
   return { start, end };
 }
 
-function venueDayKey(place, date) {
+function venueDayKey(venue, date) {
   const bounds = dayBoundsUtc(date);
   if (!bounds) return null;
-  return `${place}|${bounds.start.toISOString()}`;
+  return `${venue}|${bounds.start.toISOString()}`;
 }
 
 function normalizeTitle(s) {
@@ -72,32 +72,32 @@ function titlesLikelyMatch(a, b) {
 async function upsertConcerts(scrapedEvents, city) {
   const fetchTime = new Date();
   const seenIds = [];
-  const seenPlaces = new Set();
+  const seenVenues = new Set();
 
-  // 1) Räkna hur många scrapade events som ligger på varje (place, date).
-  //    Om >1 är place+date-fallbacken osäker för dessa - vi skippar den då.
+  // 1) Räkna hur många scrapade events som ligger på varje (venue, date).
+  //    Om >1 är venue+date-fallbacken osäker för dessa - vi skippar den då.
   const scrapeVenueDayCount = new Map();
   for (const ev of scrapedEvents) {
-    if (!ev || !ev.place || !ev.date) continue;
-    const key = venueDayKey(ev.place, ev.date);
+    if (!ev || !ev.venue || !ev.date) continue;
+    const key = venueDayKey(ev.venue, ev.date);
     if (!key) continue;
     scrapeVenueDayCount.set(key, (scrapeVenueDayCount.get(key) || 0) + 1);
   }
 
   for (const ev of scrapedEvents) {
-    if (!ev || !ev.place) continue;
-    seenPlaces.add(ev.place);
+    if (!ev || !ev.venue) continue;
+    seenVenues.add(ev.venue);
 
     let existing = null;
 
-    // (a) Primär matchning: place + link
+    // (a) Primär matchning: venue + link
     if (ev.link) {
-      existing = await Concert.findOne({ place: ev.place, link: ev.link });
+      existing = await Concert.findOne({ venue: ev.venue, link: ev.link });
     }
 
-    // (b) Fallback: place + samma kalenderdag - men bara om det är otvetydigt
+    // (b) Fallback: venue + samma kalenderdag - men bara om det är otvetydigt
     if (!existing && ev.date) {
-      const key = venueDayKey(ev.place, ev.date);
+      const key = venueDayKey(ev.venue, ev.date);
       const ambiguousInScrape =
         key && scrapeVenueDayCount.get(key) > 1; // flera scrapade events samma dag
 
@@ -105,7 +105,7 @@ async function upsertConcerts(scrapedEvents, city) {
         const bounds = dayBoundsUtc(ev.date);
         if (bounds) {
           const candidates = await Concert.find({
-            place: ev.place,
+            venue: ev.venue,
             date: { $gte: bounds.start, $lt: bounds.end },
           });
 
@@ -146,7 +146,7 @@ async function upsertConcerts(scrapedEvents, city) {
         link: ev.link,
         imageUrl: ev.imageUrl,
         date: ev.date,
-        place: ev.place,
+        venue: ev.venue,
         tickets: ev.tickets,
         city: ev.city || city,
         firstSeenAt: fetchTime,
@@ -158,14 +158,14 @@ async function upsertConcerts(scrapedEvents, city) {
   }
 
   // Avaktivera framtida events i scrapade venues som vi inte sett.
-  if (seenPlaces.size > 0) {
+  if (seenVenues.size > 0) {
     const todayStart = new Date();
     todayStart.setUTCHours(0, 0, 0, 0);
 
     await Concert.updateMany(
       {
         city,
-        place: { $in: Array.from(seenPlaces) },
+        venue: { $in: Array.from(seenVenues) },
         isActive: true,
         _id: { $nin: seenIds },
         date: { $gte: todayStart },
@@ -176,7 +176,7 @@ async function upsertConcerts(scrapedEvents, city) {
 
   return {
     upserted: seenIds.length,
-    venues: seenPlaces.size,
+    venues: seenVenues.size,
   };
 }
 

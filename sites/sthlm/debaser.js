@@ -24,7 +24,7 @@ async function getDebaserEvents(browser) {
           link: e.href,
           imageUrl: imageUrl,
           date: dateString,
-          place: "Debaser",
+          venue: "Debaser",
           city: "Stockholm",
         };
       }

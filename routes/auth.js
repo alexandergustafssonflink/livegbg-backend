@@ -99,7 +99,7 @@ router.post("/register", async (req, res) => {
         email: user.email,
         name: user.name,
         roles: user.roles,
-        place: user.place,
+        venue: user.venue,
       },
     });
   } catch (error) {
@@ -131,7 +131,7 @@ router.post("/login", async (req, res) => {
         email: user.email,
         name: user.name,
         roles: user.roles || [],
-        place: user.place,
+        venue: user.venue,
       },
     });
   } catch (error) {
@@ -169,7 +169,7 @@ router.get("/me", authenticateToken, async (req, res) => {
     name: req.user.name,
     avatarUrl: req.user.avatarUrl,
     roles: req.user.roles,
-    place: req.user.place,
+    venue: req.user.venue,
   });
 });
 

@@ -33,7 +33,7 @@ async function getPotatisenEvents(browser) {
           link: linkEl ? linkEl.href : "",
           imageUrl: imgEl ? imgEl.src : "",
           date: dateText,
-          place: "Potatisen",
+          venue: "Potatisen",
           city: "Göteborg",
         };
       }
