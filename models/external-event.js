@@ -45,20 +45,28 @@ const externalEventSchema = new mongoose.Schema({
     enum: [...GENRES, null],
     default: null,
   },
+  // Highlighted events dyker upp i den publika karusellen längst upp på
+  // hem-sidan. Sätts manuellt av organizer (för egna events) eller super-
+  // admin (för konserter via AdminConcerts).
+  highlighted: {
+    type: Boolean,
+    default: false,
+  },
   songs: {
     type: Array,
   },
 });
 
 externalEventSchema.pre("validate", function (next) {
-  if (!this.link) {
-    if (!this.eventInfo || !this.eventPrice) {
-      return next(
-        new Error(
-          "Antingen måste 'link' skickas med, eller så måste 'eventInfo', 'eventPrice' och 'ticketLink' fyllas i."
-        )
-      );
-    }
+  // Antingen länk till externt event ELLER eventInfo (beskrivning) krävs.
+  // Pris och ticketLink är valfria - en organizer kan ha events utan
+  // biljettförsäljning eller med varierande/ej annonserat pris.
+  if (!this.link && !this.eventInfo) {
+    return next(
+      new Error(
+        "Antingen 'link' eller 'eventInfo' (beskrivning) måste fyllas i."
+      )
+    );
   }
   // Säkerställ att venue är satt - antingen direkt eller via legacy place
   if (!this.venue && !this.place) {

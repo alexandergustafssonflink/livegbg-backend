@@ -114,7 +114,10 @@ router.get("/gbg", async (req, res) => {
 /**
  * GET /api/events/highlighted/:city
  * Publik endpoint för karusellen - returnerar highlighted, aktiva,
- * framtida konserter för angiven stad, sorterade på datum.
+ * framtida event för angiven stad, sorterade på datum. Slår ihop scrapade
+ * konserter (Concert) och organizer-skapade external events (ExternalEvent).
+ * External events filtreras inte på city för tillfället - vi har bara
+ * Göteborg och alla organizers ligger där.
  */
 router.get("/highlighted/:city", async (req, res) => {
   try {
@@ -145,7 +148,35 @@ router.get("/highlighted/:city", async (req, res) => {
       .sort({ date: 1 })
       .lean();
 
-    res.json(concerts);
+    const externalHighlighted = await ExternalEvents.find(
+      {
+        highlighted: true,
+        date: { $gte: todayStart },
+      }
+    )
+      .sort({ date: 1 })
+      .lean();
+
+    const mergedExternal = externalHighlighted.map((ev) => ({
+      _id: ev._id,
+      title: ev.title,
+      link: ev.link,
+      imageUrl: ev.imageUrl,
+      date: ev.date,
+      venue: ev.venue,
+      eventInfo: ev.eventInfo,
+      eventPrice: ev.eventPrice,
+      ticketLink: ev.ticketLink,
+      genre: ev.genre,
+      genreSource: ev.genre ? "admin" : null,
+      _isExternal: true,
+    }));
+
+    const merged = [...concerts, ...mergedExternal].sort(
+      (a, b) => new Date(a.date) - new Date(b.date)
+    );
+
+    res.json(merged);
   } catch (error) {
     res.status(500).json({ message: "Kunde inte hämta highlighted events.", error: error.message });
   }
@@ -174,6 +205,9 @@ router.get("/external", async (req, res) => {
 
 // Whitelist över fält en organizer får ändra på sina egna external events
 // via PATCH. Allt annat (t.ex. venue eller _id) är låst.
+// Whitelist över fält en organizer får ändra på sina egna external events
+// via PATCH. highlighted är AVSIKTLIGT inte med - den ska bara super-admin
+// kunna sätta (via /admin-rutter, inte här).
 const EXTERNAL_EDITABLE_FIELDS = [
   "title",
   "date",
@@ -265,6 +299,8 @@ router.post(
         songs,
         venue: req.user.venue,
         genre: normalizedGenre,
+        // highlighted defaultar till false i schemat - sätts manuellt av
+        // super-admin via /admin-rutten, inte vid skapande.
       };
 
       if (link && link.trim() !== "") {
@@ -334,6 +370,7 @@ router.patch(
           return res.status(400).json({ message: err.message });
         }
       }
+
 
       // Ny bild laddas upp till Cloudinary och ersätter den gamla URL:en
       if (req.file) {

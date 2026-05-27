@@ -1,5 +1,6 @@
 const router = require("express").Router();
 const Concert = require("../models/concert");
+const ExternalEvent = require("../models/external-event");
 const User = require("../models/user");
 const authenticateToken = require("../middleware/auth");
 const requireRole = require("../middleware/requireRole");
@@ -257,6 +258,128 @@ router.patch("/users/:id", async (req, res) => {
   } catch (error) {
     console.error("Admin PATCH /users error:", error);
     res.status(500).json({ message: "Kunde inte uppdatera användaren.", error: error.message });
+  }
+});
+
+/**
+ * GET /api/admin/external-events
+ * Lista alla external events (skapade av organizers). Super-admin-vy så
+ * vi kan moderera och toggla highlight oavsett vem som äger eventet.
+ *   ?includePast=true   (default: false - bara framtida events)
+ *   ?search=...         (matchning mot title/venue, case-insensitive)
+ *   ?limit=200&skip=0
+ */
+router.get("/external-events", async (req, res) => {
+  try {
+    const { search, includePast, limit = 200, skip = 0 } = req.query;
+
+    const query = {};
+    if (includePast !== "true") {
+      const todayStart = new Date();
+      todayStart.setUTCHours(0, 0, 0, 0);
+      query.date = { $gte: todayStart };
+    }
+
+    if (search) {
+      const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      query.$or = [
+        { title: { $regex: escaped, $options: "i" } },
+        { venue: { $regex: escaped, $options: "i" } },
+      ];
+    }
+
+    const events = await ExternalEvent.find(query)
+      .sort({ date: 1 })
+      .skip(Number(skip))
+      .limit(Math.min(Number(limit), 500))
+      .lean();
+
+    res.json(events);
+  } catch (error) {
+    console.error("Admin GET /external-events error:", error);
+    res.status(500).json({
+      message: "Kunde inte hämta external events.",
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * PATCH /api/admin/external-events/:id
+ * Super-admin-uppdatering av external event. Endast moderations-fält:
+ *   - highlighted (visa i karusellen)
+ *   - genre (samma enum som Concert)
+ * Organizer äger title/date/info via /api/events/external/:id - de fälten
+ * lämnar vi orörda här.
+ */
+router.patch("/external-events/:id", async (req, res) => {
+  try {
+    const updates = {};
+
+    if (Object.prototype.hasOwnProperty.call(req.body, "highlighted")) {
+      updates.highlighted =
+        req.body.highlighted === true ||
+        req.body.highlighted === "true" ||
+        req.body.highlighted === "1";
+    }
+
+    if (Object.prototype.hasOwnProperty.call(req.body, "genre")) {
+      const raw = req.body.genre;
+      if (raw === null || raw === "") {
+        updates.genre = null;
+      } else if (typeof raw === "string" && GENRES.includes(raw)) {
+        updates.genre = raw;
+      } else {
+        return res.status(400).json({
+          message: `Ogiltig genre '${raw}'. Tillåtna: ${GENRES.join(", ")}`,
+        });
+      }
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ message: "Inga fält att uppdatera." });
+    }
+
+    const updated = await ExternalEvent.findByIdAndUpdate(
+      req.params.id,
+      { $set: updates },
+      { new: true, runValidators: true }
+    );
+
+    if (!updated) {
+      return res.status(404).json({ message: "Eventet hittades inte." });
+    }
+
+    res.json(updated);
+  } catch (error) {
+    console.error("Admin PATCH /external-events error:", error);
+    res.status(500).json({
+      message: "Kunde inte uppdatera eventet.",
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * DELETE /api/admin/external-events/:id
+ * Super-admin kan radera vilket external event som helst (för moderation).
+ * Organizer:s egen delete via /api/events/external/:id är begränsad till
+ * deras egen venue - här finns ingen sådan begränsning.
+ */
+router.delete("/external-events/:id", async (req, res) => {
+  try {
+    const event = await ExternalEvent.findById(req.params.id);
+    if (!event) {
+      return res.status(404).json({ message: "Eventet hittades inte." });
+    }
+    await event.deleteOne();
+    res.json({ message: "Eventet har raderats." });
+  } catch (error) {
+    console.error("Admin DELETE /external-events error:", error);
+    res.status(500).json({
+      message: "Kunde inte radera eventet.",
+      error: error.message,
+    });
   }
 });
 
