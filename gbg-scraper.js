@@ -20,6 +20,7 @@ const filterOutNonMusic = require("./utils/filterOutNonMusic");
 const upsertConcerts = require("./utils/upsertConcerts");
 const backfillPageContent = require("./utils/backfillPageContent");
 const backfillGenres = require("./utils/backfillGenres");
+const postNewConcertsToInstagram = require("./utils/postToInstagram");
 
 dotenv.config();
 
@@ -108,6 +109,20 @@ async function getAllGbgEvents() {
     } else {
       console.log("Skipping genre backfill: ANTHROPIC_API_KEY not set.");
     }
+
+    // Posta nya events till Instagram. Körs EFTER genre-klassningen så
+    // att captions kan innehålla genre-hashtag. Skippas tyst om
+    // IG-credentials saknas. Bara events först sedda de senaste dagarna
+    // postas (skyddar mot backlog-spam), max 5 per körning.
+    if (process.env.IG_ACCESS_TOKEN && process.env.IG_USER_ID) {
+      console.log("POSTING NEW CONCERTS TO INSTAGRAM");
+      const igResult = await postNewConcertsToInstagram({ maxPerRun: 5 });
+      console.log(
+        `Instagram done: ${igResult.posted} posted, ${igResult.failed} failed.`
+      );
+    } else {
+      console.log("Skipping Instagram: IG_ACCESS_TOKEN/IG_USER_ID not set.");
+    }
   } catch (error) {
     console.log("PROBLEM");
     console.log(error);
@@ -118,10 +133,10 @@ async function getAllGbgEvents() {
 }
 
 // test()
-const job = schedule.scheduleJob("0 */4 * * *", function () {
-  getAllGbgEvents();
-});
-//getAllGbgEvents();
+// const job = schedule.scheduleJob("0 */4 * * *", function () {
+//   getAllGbgEvents();
+// });
+getAllGbgEvents();
 // const job = schedule.scheduleJob("*/5 * * * *", function () {
 //   getAllEvents();
 // });

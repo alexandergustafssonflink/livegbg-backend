@@ -53,6 +53,13 @@ const concertSchema = new mongoose.Schema(
     //     upprepad API-användning på events som är svåra att klassificera.
     isNotLiveMusic: { type: Boolean, default: false },
     genreClassificationFailedAt: { type: Date },
+
+    // Instagram-publicering. postedAt sätts när eventet postats till
+    // @livegbg.se via Graph API — händer max en gång per event.
+    // postFailedAt sätts vid misslyckad postning; jobbet retryar inte
+    // inom 3 dagar (t.ex. trasig bild-URL som inte lär laga sig själv).
+    instagramPostedAt: { type: Date },
+    instagramPostFailedAt: { type: Date },
   },
   { timestamps: true }
 );
@@ -73,6 +80,8 @@ concertSchema.index({ pageContent: 1, genre: 1, isActive: 1 });
 concertSchema.index({ genreClassificationFailedAt: 1, isActive: 1 });
 // Track non-livemusic events
 concertSchema.index({ isNotLiveMusic: 1, isActive: 1 });
+// Instagram-kö: opostade aktiva events
+concertSchema.index({ instagramPostedAt: 1, isActive: 1, firstSeenAt: 1 });
 
 // Bakåtkompatibel läsning under övergångsperioden från place→venue.
 // OBS: Concert.venue lowercaseas INTE av pluginen för Concert-dokument
