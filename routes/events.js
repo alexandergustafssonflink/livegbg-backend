@@ -97,12 +97,20 @@ router.get("/gbg", async (req, res) => {
       });
     });
 
+    // "Senast uppdaterad" ska vara när scrapern senast SÅG datan — inte
+    // när API-anropet råkade göras (som det var tidigare, vilket alltid
+    // såg färskt ut även när scrapern legat nere i veckor).
+    const latest = await Concert.findOne({ city: "Göteborg" })
+      .sort({ lastSeenAt: -1 })
+      .select("lastSeenAt")
+      .lean();
+
     // Behåll samma response-form som tidigare så frontend slipper ändras:
     // en array med ett objekt som har `events`-arrayen i sig.
     res.json([
       {
         city: "Göteborg",
-        date: new Date(),
+        date: latest?.lastSeenAt || null,
         events: merged,
       },
     ]);

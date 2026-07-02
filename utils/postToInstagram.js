@@ -133,6 +133,7 @@ function formatSwedishDate(date) {
     weekday: "long",
     day: "numeric",
     month: "long",
+    year: "numeric",
     timeZone: "Europe/Stockholm",
   }).format(new Date(date));
 }
