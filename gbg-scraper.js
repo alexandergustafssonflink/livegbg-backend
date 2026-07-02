@@ -133,10 +133,10 @@ async function getAllGbgEvents() {
 }
 
 // test()
-// const job = schedule.scheduleJob("0 */4 * * *", function () {
-//   getAllGbgEvents();
-// });
-getAllGbgEvents();
+const job = schedule.scheduleJob("0 */4 * * *", function () {
+  getAllGbgEvents();
+});
+//getAllGbgEvents()
 // const job = schedule.scheduleJob("*/5 * * * *", function () {
 //   getAllEvents();
 // });
