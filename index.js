@@ -13,8 +13,24 @@ const favoritesRoute = require("./routes/favorites");
 const merchRoute = require("./routes/merch");
 const analyticsRoute = require("./routes/analytics");
 const { startAnalyticsCleanup } = require("./jobs/cleanupAnalytics");
+const nodeSchedule = require("node-schedule");
 
 dotenv.config();
+
+if (process.env.IG_ACCESS_TOKEN && process.env.IG_USER_ID) {
+  const postNewConcertsToInstagram = require("./utils/postToInstagram");
+  nodeSchedule.scheduleJob("30 8,17 * * *", async () => {
+    try {
+      const r = await postNewConcertsToInstagram({ maxPerRun: 5 });
+      if (r.posted || r.failed) console.log("[instagram] Schemakörning:", r);
+    } catch (err) {
+      console.error("[instagram] Schemakörning kraschade:", err.message);
+    }
+  });
+  console.log(
+    "[instagram] Postningsschema aktivt (08:30 & 17:30 UTC, max 5/körning)"
+  );
+}
 
 // Passport används stateless (session: false) så vi behöver inga sessions
 app.use(passport.initialize());
