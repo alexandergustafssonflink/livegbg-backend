@@ -12,6 +12,7 @@ const adminRoute = require("./routes/admin");
 const favoritesRoute = require("./routes/favorites");
 const merchRoute = require("./routes/merch");
 const analyticsRoute = require("./routes/analytics");
+const sitemapRoute = require("./routes/sitemap");
 const { startAnalyticsCleanup } = require("./jobs/cleanupAnalytics");
 const nodeSchedule = require("node-schedule");
 
@@ -86,6 +87,9 @@ app.use("/api/admin", adminRoute);
 app.use("/api/favorites", favoritesRoute);
 app.use("/api/merch", merchRoute);
 app.use("/api/analytics", analyticsRoute);
+// Sitemap serveras på rot-nivå (inte /api) — exponeras som
+// https://www.livegbg.se/sitemap.xml via rewrite i frontendens vercel.json
+app.use("/", sitemapRoute);
 
 // Starta schemalagt jobb för GDPR-städning av analytics-data
 startAnalyticsCleanup();
