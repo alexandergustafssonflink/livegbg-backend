@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const GENRES = require("../utils/genres");
 const dualVenueField = require("../utils/dualVenueField");
+const { generateEventSlug } = require("../utils/eventSlug");
 
 const concertSchema = new mongoose.Schema(
   {
@@ -11,6 +12,12 @@ const concertSchema = new mongoose.Schema(
     venue: { type: String },
     tickets: { type: String },
     city: { type: String },
+
+    // URL-slug för /event/:slug på frontend + sitemap.
+    // Sätts automatiskt i pre-save när den saknas och ändras ALDRIG efter
+    // det (delade/Google-indexerade länkar ska inte ruttna även om titeln
+    // uppdateras vid omscrape). Unikhet garanteras av id-suffixet i sluggen.
+    slug: { type: String, index: true },
 
     // Manuellt redigerbara fält (super-admin)
     genre: { type: String, enum: [...GENRES, null], default: null },
@@ -90,5 +97,14 @@ concertSchema.index({ instagramPostedAt: 1, isActive: 1, firstSeenAt: 1 });
 // behåller pluginen sin case-insensitive matchning för bakåtkomp men
 // rör inte stored values.
 concertSchema.plugin(dualVenueField);
+
+// Auto-generera slug för nya dokument (och gamla som saknar en när de
+// ändå sparas, t.ex. vid scrape-uppdatering). Befintlig slug rörs aldrig.
+concertSchema.pre("save", function (next) {
+  if (!this.slug) {
+    this.slug = generateEventSlug(this);
+  }
+  next();
+});
 
 module.exports = mongoose.model("Concert", concertSchema, "concerts");

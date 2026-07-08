@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const dualVenueField = require("../utils/dualVenueField");
 const GENRES = require("../utils/genres");
+const { generateEventSlug } = require("../utils/eventSlug");
 
 const externalEventSchema = new mongoose.Schema({
   title: {
@@ -10,6 +11,12 @@ const externalEventSchema = new mongoose.Schema({
   date: {
     type: Date,
     required: true,
+  },
+  // URL-slug för /event/:slug — samma system som Concert.slug (se
+  // utils/eventSlug.js). Sätts i pre-save, ändras aldrig därefter.
+  slug: {
+    type: String,
+    index: true,
   },
   // Venue normaliseras till trim+lowercase så queries mot User.venue matchar
   // även om någon skrivit olika skiftläge på olika ställen. Inte required
@@ -77,6 +84,14 @@ externalEventSchema.pre("validate", function (next) {
 
 // Bakåtkompatibel läsning under övergångsperioden från place→venue.
 externalEventSchema.plugin(dualVenueField);
+
+// Auto-generera slug för nya dokument. Befintlig slug rörs aldrig.
+externalEventSchema.pre("save", function (next) {
+  if (!this.slug) {
+    this.slug = generateEventSlug(this);
+  }
+  next();
+});
 
 module.exports = mongoose.model(
   "ExternalEvent",

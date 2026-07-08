@@ -65,6 +65,7 @@ router.get("/gbg", async (req, res) => {
         genreConfidence: 1,
         genreSource: 1,
         highlighted: 1,
+        slug: 1,
       }
     )
       .sort({ date: 1 })
@@ -77,6 +78,7 @@ router.get("/gbg", async (req, res) => {
     externalEvents.forEach((externalEvent) => {
       merged.push({
         _id: externalEvent._id,
+        slug: externalEvent.slug,
         title: externalEvent.title,
         link: externalEvent.link,
         imageUrl: externalEvent.imageUrl,
@@ -151,6 +153,7 @@ router.get("/highlighted/:city", async (req, res) => {
         genre: 1,
         genreConfidence: 1,
         genreSource: 1,
+        slug: 1,
       }
     )
       .sort({ date: 1 })
@@ -167,6 +170,7 @@ router.get("/highlighted/:city", async (req, res) => {
 
     const mergedExternal = externalHighlighted.map((ev) => ({
       _id: ev._id,
+      slug: ev.slug,
       title: ev.title,
       link: ev.link,
       imageUrl: ev.imageUrl,
@@ -187,6 +191,81 @@ router.get("/highlighted/:city", async (req, res) => {
     res.json(merged);
   } catch (error) {
     res.status(500).json({ message: "Kunde inte hämta highlighted events.", error: error.message });
+  }
+});
+
+/**
+ * GET /api/events/by-slug/:slug
+ * Publik endpoint för konsertsidan (/event/:slug på frontend).
+ *
+ * Slår upp i BÅDA collections (Concert + ExternalEvent) och returnerar en
+ * normaliserad shape som matchar events i /gbg-listan, plus `hasPassed`.
+ *
+ * OBS: returnerar även inaktiva/passerade events med 200 — sidan för en
+ * passerad konsert ska leva kvar ("har redan varit"-läge på frontend) så
+ * delade länkar och inkommande länkvärde inte dör. 404 bara när sluggen
+ * inte finns alls.
+ */
+router.get("/by-slug/:slug", async (req, res) => {
+  try {
+    const { slug } = req.params;
+    if (!slug) return res.status(400).json({ message: "Slug saknas." });
+
+    let event = await Concert.findOne({ slug }).lean();
+    let isExternal = false;
+
+    if (!event) {
+      event = await ExternalEvents.findOne({ slug }).lean();
+      isExternal = !!event;
+    }
+
+    if (!event) {
+      return res.status(404).json({ message: "Eventet hittades inte." });
+    }
+
+    const now = new Date();
+    // Räkna som passerat först dagen EFTER konsertdatumet (kvällskonserter
+    // ska inte flaggas som passerade samma dag).
+    const eventDate = event.date ? new Date(event.date) : null;
+    let hasPassed = false;
+    if (eventDate && !isNaN(eventDate.getTime())) {
+      const dayAfter = new Date(
+        Date.UTC(
+          eventDate.getUTCFullYear(),
+          eventDate.getUTCMonth(),
+          eventDate.getUTCDate() + 1
+        )
+      );
+      hasPassed = now >= dayAfter;
+    }
+
+    res.json({
+      _id: event._id,
+      slug: event.slug,
+      title: event.title,
+      link: event.link,
+      imageUrl: event.imageUrl,
+      date: event.date,
+      venue: event.venue,
+      city: event.city,
+      tickets: event.tickets,
+      eventInfo: event.eventInfo,
+      eventPrice: event.eventPrice,
+      ticketLink: event.ticketLink,
+      genre: event.genre,
+      genreConfidence: event.genreConfidence,
+      genreSource: isExternal ? (event.genre ? "admin" : null) : event.genreSource,
+      songs: event.songs,
+      _isExternal: isExternal,
+      hasPassed,
+      // isActive=false + framtida datum = inställd/borttagen från källan.
+      isActive: isExternal ? true : event.isActive !== false,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Kunde inte hämta eventet.",
+      error: error.message,
+    });
   }
 });
 
