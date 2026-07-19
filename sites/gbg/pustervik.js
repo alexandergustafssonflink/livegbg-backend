@@ -31,8 +31,17 @@ async function getPustervikEvents(browser) {
         const div = e.querySelector(".img-holder");
         const style = window.getComputedStyle(div, false);
         const image = style.backgroundImage.slice(4, -1).replace(/"/g, "");
-        const allLinks = e.querySelectorAll("a");
-        const eventLink = allLinks.length >= 2 ? allLinks[1].href : ""; // Hämta den andra "a"-taggen om den finns
+        // Event-länken: ta den stabila permalänken i första hand. Fall inte
+        // tillbaka på positionsgissning (allLinks[1]) — gratis-events har
+        // bara EN <a> ("Läs mer"), medan "FRI ENTRÉ" är en <span>. Då blev
+        // länken tom, vilket slog ut avdupliceringen (venue+link) och gjorde
+        // att samma event scrapades in som en ny post varje körning.
+        const moreButton = e.querySelector("a.more-button");
+        const anyLink = e.querySelector("a[href]");
+        const eventLink =
+          e.getAttribute("data-permalink") ||
+          (moreButton ? moreButton.href : "") ||
+          (anyLink ? anyLink.href : "");
         return {
           title: e
             .querySelector("h2")

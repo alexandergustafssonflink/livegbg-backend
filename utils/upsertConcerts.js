@@ -7,12 +7,16 @@ const Concert = require("../models/concert");
  * Matchningsstrategi (i prioritetsordning):
  *   1. venue + link  - URL:en är typiskt stabil även om titeln ändras
  *      (t.ex. "Linkin park" -> "Linkin park + Soundgarden")
- *   2. venue + samma datum - en venue har sällan flera events samma dag,
- *      MEN vi använder den här fallbacken bara när det är otvetydigt:
- *        - scrapen får inte ha flera events på samma venue+date
- *        - DB:n får inte ha flera kandidater på samma venue+date
- *        - titeln måste dela något ord med kandidatens titel (eller vara
- *          substring), så ett helt nytt event på samma dag inte krockar
+ *   2. venue + kalenderdag + titel - används när link saknas eller ändrats.
+ *        - Exakt (normaliserad) titelmatch används även om det finns flera
+ *          kandidater samma dag; vi väljer då ÄLDSTA dokumentet så upprepade
+ *          scrapes konvergerar mot samma post istället för att skapa dubbletter.
+ *        - "Rimligt lik" titel (delat ord/substring) används bara när det är
+ *          otvetydigt (exakt en kandidat), så olika events samma kväll inte
+ *          mergas ihop.
+ *      OBS: tidigare krävde fallbacken exakt EN kandidat även för identisk
+ *      titel. Det gjorde att ett event med tom link (t.ex. gratis-events)
+ *      duplicerades vid varje scrape — dubbletten kunde aldrig slås ihop igen.
  *
  * Events som inte längre dyker upp i en fetch markeras som inaktiva, men
  * BARA inom de venues som faktiskt returnerade minst ett event den här
@@ -29,12 +33,6 @@ function dayBoundsUtc(date) {
   const end = new Date(start);
   end.setUTCDate(end.getUTCDate() + 1);
   return { start, end };
-}
-
-function venueDayKey(venue, date) {
-  const bounds = dayBoundsUtc(date);
-  if (!bounds) return null;
-  return `${venue}|${bounds.start.toISOString()}`;
 }
 
 function normalizeTitle(s) {
@@ -74,49 +72,54 @@ async function upsertConcerts(scrapedEvents, city) {
   const seenIds = [];
   const seenVenues = new Set();
 
-  // 1) Räkna hur många scrapade events som ligger på varje (venue, date).
-  //    Om >1 är venue+date-fallbacken osäker för dessa - vi skippar den då.
-  const scrapeVenueDayCount = new Map();
-  for (const ev of scrapedEvents) {
-    if (!ev || !ev.venue || !ev.date) continue;
-    const key = venueDayKey(ev.venue, ev.date);
-    if (!key) continue;
-    scrapeVenueDayCount.set(key, (scrapeVenueDayCount.get(key) || 0) + 1);
-  }
-
   for (const ev of scrapedEvents) {
     if (!ev || !ev.venue) continue;
     seenVenues.add(ev.venue);
 
     let existing = null;
 
-    // (a) Primär matchning: venue + link
+    // (a) Primär matchning: venue + link (stabil när länken finns).
     if (ev.link) {
       existing = await Concert.findOne({ venue: ev.venue, link: ev.link });
     }
 
-    // (b) Fallback: venue + samma kalenderdag - men bara om det är otvetydigt
-    if (!existing && ev.date) {
-      const key = venueDayKey(ev.venue, ev.date);
-      const ambiguousInScrape =
-        key && scrapeVenueDayCount.get(key) > 1; // flera scrapade events samma dag
+    // (b) Fallback när länken saknas eller ändrats: matcha på venue +
+    //     kalenderdag + titel. Detta är skyddsnätet mot runaway-dubbletter:
+    //     tidigare krävde fallbacken exakt EN befintlig kandidat, så fort en
+    //     dubblett hade uppstått (t.ex. pga tom link) kunde den aldrig slå
+    //     ihop igen och varje scrape skapade en ny post. Nu matchar vi på
+    //     titel och väljer ÄLDSTA dokumentet, så upprepade scrapes alltid
+    //     konvergerar mot samma post — även om en backlog av dubbletter finns.
+    if (!existing && ev.date && ev.title) {
+      const bounds = dayBoundsUtc(ev.date);
+      if (bounds) {
+        const sameDay = await Concert.find({
+          venue: ev.venue,
+          date: { $gte: bounds.start, $lt: bounds.end },
+        });
 
-      if (!ambiguousInScrape) {
-        const bounds = dayBoundsUtc(ev.date);
-        if (bounds) {
-          const candidates = await Concert.find({
-            venue: ev.venue,
-            date: { $gte: bounds.start, $lt: bounds.end },
-          });
+        const evNorm = normalizeTitle(ev.title);
 
-          // Bara säkert om det finns exakt EN befintlig kandidat OCH
-          // titeln är rimligt lik
-          if (
-            candidates.length === 1 &&
-            titlesLikelyMatch(ev.title, candidates[0].title)
-          ) {
-            existing = candidates[0];
-          }
+        // 1) Exakt (normaliserad) titelmatch — säkrast, och täcker det vanliga
+        //    fallet där identisk titel scrapas om och om igen. Fungerar även
+        //    med flera kandidater eftersom titeln är otvetydig.
+        let matches = sameDay.filter((c) => normalizeTitle(c.title) === evNorm);
+
+        // 2) Annars: en "rimligt lik" titel (t.ex. "Band" -> "Band + support"),
+        //    men bara när det är otvetydigt (exakt en kandidat), så vi aldrig
+        //    mergar ihop två olika events som råkar ligga samma kväll.
+        if (matches.length === 0) {
+          const fuzzy = sameDay.filter((c) =>
+            titlesLikelyMatch(ev.title, c.title)
+          );
+          if (fuzzy.length === 1) matches = fuzzy;
+        }
+
+        if (matches.length > 0) {
+          existing = matches.sort(
+            (a, b) =>
+              new Date(a.firstSeenAt || 0) - new Date(b.firstSeenAt || 0)
+          )[0];
         }
       }
     }
