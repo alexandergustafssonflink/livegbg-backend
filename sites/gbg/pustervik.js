@@ -1,107 +1,198 @@
+// Pustervik bytte hemsida (aug 2026). Events ligger nu på /kalender och
+// renderas klient-sida (DatoCMS + React). Korten visas som ett rutnät först
+// när man klickat på "Visa som rutnät"-knappen, och bilderna lazy-laddas vid
+// scroll. Den här scrapern återskapar exakt samma utdata-form som tidigare:
+//   { title, link, tickets, imageUrl, date, venue, city }
+
+const MONTHS = [
+  "januari",
+  "februari",
+  "mars",
+  "april",
+  "maj",
+  "juni",
+  "juli",
+  "augusti",
+  "september",
+  "oktober",
+  "november",
+  "december",
+];
+
+// Körs i browser-kontext via page.evaluate. Får BARA referera window/document
+// (ingen closure över Node-variabler), därför upprepas månadslistan här inne.
+// Returnerar råa strängfält; datum-tolkning/år-rollover görs sen i Node.
+function extractPustervikCardsInBrowser() {
+  const MONTHS_UP = [
+    "JANUARI",
+    "FEBRUARI",
+    "MARS",
+    "APRIL",
+    "MAJ",
+    "JUNI",
+    "JULI",
+    "AUGUSTI",
+    "SEPTEMBER",
+    "OKTOBER",
+    "NOVEMBER",
+    "DECEMBER",
+  ];
+  const monthRe = new RegExp("(\\d{1,2})\\s+(" + MONTHS_UP.join("|") + ")", "i");
+
+  const seen = new Set();
+  const out = [];
+
+  document.querySelectorAll('a[href*="/evenemang/"]').forEach((a) => {
+    const href = a.getAttribute("href");
+    if (!href) return;
+    const link = a.href; // absolut URL i browsern
+    if (seen.has(link)) return;
+
+    // Kort-roten innehåller både länken (bild + titel) och meta-blocket
+    // (datum, arrangör, pris, biljettknapp) som ligger som syskon till <a>.
+    const root = a.closest(".group") || a.parentElement || a;
+
+    const titleEl = a.querySelector("h3");
+    const title = titleEl ? titleEl.textContent.trim() : "";
+    if (!title) return;
+
+    // Bild: den riktiga <picture><img> har en http-src (base64-plattformen
+    // är aria-hidden). Faller tillbaka på största bilden i <source srcset>.
+    let imageUrl = "";
+    const realImg = a.querySelector('picture img[src^="http"], img[src^="http"]');
+    if (realImg) {
+      imageUrl = realImg.src;
+    } else {
+      const source = a.querySelector("picture source[srcset]");
+      if (source) {
+        const parts = source
+          .getAttribute("srcset")
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+        if (parts.length) {
+          imageUrl = parts[parts.length - 1].split(/\s+/)[0];
+        }
+      }
+    }
+
+    // Datum-spannet är den meta-span vars text matchar "<dag> <MÅNAD>".
+    let rawDate = "";
+    const spans = root.querySelectorAll("span");
+    for (const s of spans) {
+      const t = s.textContent.trim();
+      if (monthRe.test(t)) {
+        rawDate = t;
+        break;
+      }
+    }
+
+    // Biljettlänk: <a> i kortet som pekar på tickster / har texten "Köp biljett".
+    let tickets = "";
+    const anchors = root.querySelectorAll("a[href]");
+    for (const x of anchors) {
+      const xh = x.href || "";
+      if (/tickster|biljett|ticket/i.test(xh) || /köp\s*biljett/i.test(x.textContent)) {
+        tickets = xh;
+        break;
+      }
+    }
+
+    seen.add(link);
+    out.push({ title, link, tickets, imageUrl, rawDate });
+  });
+
+  return out;
+}
+
+// Tolkar råa kort till slutlig form med riktiga Date-objekt. Sköter år-rollover:
+// kalendern listas kronologiskt, så när månaden "hoppar bakåt" (t.ex. dec -> jan)
+// har vi passerat ett årsskifte.
+function normalizePustervikEvents(rawEvents) {
+  const monthRe = new RegExp("(\\d{1,2})\\s+(" + MONTHS.join("|") + ")", "i");
+  const result = [];
+  let year = new Date().getUTCFullYear();
+  let prevMonth = null;
+
+  for (const raw of rawEvents) {
+    const m = raw.rawDate ? raw.rawDate.toLowerCase().match(monthRe) : null;
+    if (!m) continue; // hoppa kort utan tolkbart datum
+
+    const day = parseInt(m[1], 10);
+    const monthIndex = MONTHS.indexOf(m[2]); // 0-baserat
+
+    if (prevMonth !== null && monthIndex < prevMonth) {
+      year++; // månaden gick bakåt => nytt år
+    }
+    prevMonth = monthIndex;
+
+    result.push({
+      title: raw.title,
+      link: raw.link,
+      tickets: raw.tickets || "",
+      imageUrl: raw.imageUrl || "",
+      date: new Date(Date.UTC(year, monthIndex, day)),
+      venue: "Pustervik",
+      city: "Göteborg",
+    });
+  }
+
+  return result;
+}
+
 async function getPustervikEvents(browser) {
   const page = await browser.newPage();
   page.setDefaultNavigationTimeout(0);
-  await page.goto("https://pustervik.nu/", { waitUntil: "networkidle0" });
+  await page.goto("https://pustervik.nu/kalender", { waitUntil: "networkidle0" });
+
+  // Byt till rutnätsvyn så att korten renderas med bilder. Knappen kan redan
+  // vara aktiv (aria-pressed="true") – då gör vi inget.
+  try {
+    await page.waitForSelector('button[aria-label="Visa som rutnät"]', {
+      timeout: 15000,
+    });
+    await page.evaluate(() => {
+      const btn = document.querySelector('button[aria-label="Visa som rutnät"]');
+      if (btn && btn.getAttribute("aria-pressed") !== "true") btn.click();
+    });
+  } catch (e) {
+    // Knappen kunde inte hittas – fortsätt ändå, sidan kan redan visa rutnät.
+  }
+
+  // Vänta in att minst ett event-kort finns.
+  try {
+    await page.waitForSelector('a[href*="/evenemang/"]', { timeout: 15000 });
+  } catch (e) {}
+
+  // Lazy-load: scrolla igenom hela sidan så alla kort och bilder laddas in.
   await page.evaluate(async () => {
-    await new Promise((resolve, reject) => {
-      var totalHeight = 0;
-      var distance = 100;
-      var timer = setInterval(() => {
-        var scrollHeight = document.body.scrollHeight;
+    await new Promise((resolve) => {
+      let totalHeight = 0;
+      const distance = 400;
+      const timer = setInterval(() => {
+        const scrollHeight = document.body.scrollHeight;
         window.scrollBy(0, distance);
         totalHeight += distance;
-
         if (totalHeight >= scrollHeight - window.innerHeight) {
           clearInterval(timer);
           resolve();
         }
-      }, 300);
+      }, 250);
     });
   });
-  await page.waitForTimeout(1000);
-  const events = await page.evaluate(() =>
-    Array.from(document.querySelectorAll(".single.event"), (e) => {
-      if (
-        !e.querySelector("h2").textContent.toLowerCase().includes("event") &&
-        !e
-          .querySelector("h2")
-          .textContent.toLowerCase()
-          .includes("okategoriserad")
-      ) {
-        const div = e.querySelector(".img-holder");
-        const style = window.getComputedStyle(div, false);
-        const image = style.backgroundImage.slice(4, -1).replace(/"/g, "");
-        // Event-länken: ta den stabila permalänken i första hand. Fall inte
-        // tillbaka på positionsgissning (allLinks[1]) — gratis-events har
-        // bara EN <a> ("Läs mer"), medan "FRI ENTRÉ" är en <span>. Då blev
-        // länken tom, vilket slog ut avdupliceringen (venue+link) och gjorde
-        // att samma event scrapades in som en ny post varje körning.
-        const moreButton = e.querySelector("a.more-button");
-        const anyLink = e.querySelector("a[href]");
-        const eventLink =
-          e.getAttribute("data-permalink") ||
-          (moreButton ? moreButton.href : "") ||
-          (anyLink ? anyLink.href : "");
-        return {
-          title: e
-            .querySelector("h2")
-            .textContent.trim()
-            .replace("konsert\n\t\t\t\t", ""),
-          link: eventLink,
-          tickets: e.querySelector("a.button.tickets")
-            ? e.querySelector("a.button.tickets").href
-            : "",
-          imageUrl: image,
-          date: e
-            .querySelector("time")
-            .textContent.replace("idag ", "")
-            .replace(/(\r\n|\n|\r)/gm, "")
-            .replace("\t\t\t\t", "")
-            .replace("\t\t\t\t", ""),
-          venue: "Pustervik",
-          city: "Göteborg",
-        };
-      }
-    })
-  );
-  let fEvents = events.filter((event) => event !== null);
-  let year = Number(new Date().toString().split(" ")[3]);
-  for (let i = 0; i < fEvents.length; i++) {
-    let event = fEvents[i];
+  await page.waitForTimeout(1500);
+  // Scrolla tillbaka upp (vissa lazy-loaders behöver ett andra svep).
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(500);
 
-    if (
-      event.date.includes("januari") &&
-      fEvents[i - 1]?.date.includes("december")
-    ) {
-      year++;
-    }
-    let newDate =
-      year + " " + event.date.split(" ")[2] + " " + event.date.split(" ")[1];
+  const rawEvents = await page.evaluate(extractPustervikCardsInBrowser);
+  const events = normalizePustervikEvents(rawEvents);
 
-    event.date = newDate;
-  }
-
-  for (let i = 0; i < fEvents.length; i++) {
-    fEvents[i].date = fEvents[i].date
-      .replace("januari", "1")
-      .replace("februari", "2")
-      .replace("mars", "3")
-      .replace("april", "4")
-      .replace("maj", "5")
-      .replace("juni", "6")
-      .replace("juli", "7")
-      .replace("augusti", "8")
-      .replace("september", "9")
-      .replace("oktober", "10")
-      .replace("november", "11")
-      .replace("december", "12");
-    let year = fEvents[i].date.split(" ")[0];
-    let month = fEvents[i].date.split(" ")[1];
-    let day = fEvents[i].date.split(" ")[2];
-    fEvents[i].date = new Date(Date.UTC(year, month - 1, day));
-  }
   await page.close();
-  return fEvents;
+  return events;
 }
 
 module.exports = getPustervikEvents;
+// Exporteras för enhetstest (körs mot jsdom med samma logik som i browsern).
+module.exports.extractPustervikCardsInBrowser = extractPustervikCardsInBrowser;
+module.exports.normalizePustervikEvents = normalizePustervikEvents;
